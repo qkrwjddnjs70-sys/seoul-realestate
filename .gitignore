@@ -1,0 +1,38 @@
+# 비밀: 절대 커밋 금지
+**/.env
+**/.env.local
+**/.env.production
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# Node
+node_modules/
+dist/
+build/
+.vite/
+
+# 개발 산출물
+*.tmp
+*.bak
+*_out.txt
+backend/check_*.py
+backend/test_*.py
+backend/slope_out.log
+backend/slope_err.log
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Claude
+.claude/

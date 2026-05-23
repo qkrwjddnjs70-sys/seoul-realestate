@@ -1,0 +1,284 @@
+import re
+from typing import Optional
+from fastapi import APIRouter, Query
+
+import database as db_module
+from data.mock_properties import PROPERTIES
+
+router = APIRouter()
+
+
+def _use_db() -> bool:
+    try:
+        return db_module.db_exists()
+    except Exception:
+        return False
+
+
+# ───── 아파트 이름 풀네임 보정 ─────
+# 같은 단지명("우성" 등)이 여러 동에 흩어져 있으면 동 접두어를 붙여 구분한다.
+_AMBIGUOUS_BASES = None
+
+
+def _base_name(name: str) -> str:
+    """끝의 숫자·차 제거: '우성1차'→'우성', '신길우성2'→'신길우성'"""
+    return re.sub(r"\d+\s*차?$", "", name or "").strip()
+
+
+def _dong_prefix(dong: str) -> str:
+    """'신길동'→'신길', '당산동5가'→'당산', '여의도동'→'여의도'"""
+    if not dong:
+        return ""
+    return dong.split("동")[0].strip()
+
+
+def _load_ambiguous() -> set:
+    """2개 이상의 동에 걸쳐 존재하는 단지명(base) 집합"""
+    global _AMBIGUOUS_BASES
+    if _AMBIGUOUS_BASES is not None:
+        return _AMBIGUOUS_BASES
+    base_dongs: dict[str, set] = {}
+    try:
+        conn = db_module.get_db()
+        rows = conn.execute("SELECT name, dong FROM apartments WHERE geocoded=1").fetchall()
+        conn.close()
+        for r in rows:
+            base = _base_name(r["name"])
+            if base:
+                base_dongs.setdefault(base, set()).add(r["dong"])
+    except Exception:
+        pass
+    _AMBIGUOUS_BASES = {b for b, dongs in base_dongs.items() if len(dongs) >= 2}
+    return _AMBIGUOUS_BASES
+
+
+def _display_name(name: str, dong: str) -> str:
+    """모호한 단지명에 동 접두어 부여 + 끝 숫자 → N차"""
+    if not name:
+        return name
+    out = name
+    base = _base_name(name)
+    prefix = _dong_prefix(dong)
+    # 동 접두어 (모호한 이름 + 아직 접두어 없을 때)
+    if base in _load_ambiguous() and prefix and prefix not in name:
+        out = prefix + name
+    # 끝자리 한 자리 숫자 → N차 (이미 차/단지/주공이면 건너뜀)
+    if not any(x in out for x in ("차", "단지", "주공")):
+        out = re.sub(r"(?<!\d)(\d)$", r"\1차", out)
+    return out
+
+
+def _mock_to_property(p: dict) -> dict:
+    return {
+        "id":             p["id"],
+        "name":           p["name"],
+        "address":        p["address"],
+        "lat":            p["lat"],
+        "lng":            p["lng"],
+        "price":          p["price"],
+        "area_m2":        p["area_m2"],
+        "floor":          p.get("floor", 0),
+        "total_floors":   p.get("total_floors", 0),
+        "units":          p.get("units", 0),
+        "built_year":     p.get("built_year", 0),
+        "nearest_subway": p.get("nearest_subway", ""),
+        "subway_line":    p.get("subway_line", ""),
+        "walk_minutes":   p.get("walk_minutes", 0),
+        "bus_routes":     p.get("bus_routes", []),
+        "transaction_date": p.get("transaction_date", ""),
+        "lawd_cd":        p.get("lawd_cd", ""),
+        "hojaes":         p.get("hojaes", []),
+        "is_mock":        True,
+    }
+
+
+def _db_to_property(row: dict) -> dict:
+    return {
+        "id":             row["id"],
+        "name":           row.get("display_name") or _display_name(row["name"], row["dong"]),
+        "address":        row["address"],
+        "lat":            row["lat"],
+        "lng":            row["lng"],
+        "price":          row["last_price"],
+        "area_m2":        row["area_m2"],
+        "floor":          row["floor"],
+        "total_floors":   row["total_floors"],
+        "units":          row["units"],
+        "far":            row["far"],
+        "slope":          row["slope"] if "slope" in row.keys() else 0,
+        "built_year":     row["built_year"],
+        "nearest_subway": row["nearest_subway"],
+        "subway_line":    row["subway_line"],
+        "walk_minutes":   row["walk_minutes"],
+        "bus_routes":     row["bus_routes"],
+        "transaction_date": row["last_deal_date"],
+        "lawd_cd":        row["lawd_cd"],
+        "hojaes":         row["hojaes"],
+        "commute": {
+            "gangnam":     row.get("time_gangnam", 0),
+            "yeouido":     row.get("time_yeouido", 0),
+            "gwanghwamun": row.get("time_gwanghwamun", 0),
+            "siccheong":   row.get("time_siccheong", 0),
+            "hongdae":     row.get("time_hongdae", 0),
+        },
+        "is_mock":        False,
+    }
+
+
+@router.get("")
+def get_properties(
+    max_walk_minutes:    Optional[int]   = Query(None),
+    min_units:           Optional[int]   = Query(None),
+    max_units:           Optional[int]   = Query(None),
+    min_price:           Optional[int]   = Query(None),
+    max_price:           Optional[int]   = Query(None),
+    min_built_year:      Optional[int]   = Query(None),
+    max_built_year:      Optional[int]   = Query(None),
+    subway_station:      Optional[str]   = Query(None),
+    apt_name:            Optional[str]   = Query(None),
+    hojaes:              Optional[str]   = Query(None),
+    max_time_gangnam:    Optional[int]   = Query(None),
+    max_time_yeouido:    Optional[int]   = Query(None),
+    max_time_gwanghwamun:Optional[int]   = Query(None),
+    max_time_siccheong:  Optional[int]   = Query(None),
+    max_time_hongdae:    Optional[int]   = Query(None),
+    lat_min:             Optional[float] = Query(None),
+    lat_max:             Optional[float] = Query(None),
+    lng_min:             Optional[float] = Query(None),
+    lng_max:             Optional[float] = Query(None),
+    lat_center:          Optional[float] = Query(None),
+    lng_center:          Optional[float] = Query(None),
+    lawd_cd:             Optional[str]   = Query(None),
+    dong:                Optional[str]   = Query(None),
+    bounds_size:         Optional[float] = Query(None),
+):
+    hojae_list = [t.strip() for t in hojaes.split(",") if t.strip()] if hojaes else None
+
+    if _use_db():
+        rows = db_module.get_apartments(
+            max_walk_minutes=max_walk_minutes,
+            min_units=min_units, max_units=max_units,
+            min_price=min_price, max_price=max_price,
+            min_built_year=min_built_year, max_built_year=max_built_year,
+            subway_station=subway_station,
+            apt_name=apt_name,
+            hojaes=hojae_list,
+            max_time_gangnam=max_time_gangnam,
+            max_time_yeouido=max_time_yeouido,
+            max_time_gwanghwamun=max_time_gwanghwamun,
+            max_time_siccheong=max_time_siccheong,
+            max_time_hongdae=max_time_hongdae,
+            lat_min=lat_min, lat_max=lat_max,
+            lng_min=lng_min, lng_max=lng_max,
+            lat_center=lat_center, lng_center=lng_center,
+            lawd_cd=lawd_cd,
+            dong=dong,
+            bounds_size=bounds_size,
+        )
+        items = [_db_to_property(r) for r in rows]
+        is_mock = False
+    else:
+        filtered = _filter_mock(
+            max_walk_minutes, min_units, max_units,
+            min_price, max_price, min_built_year, max_built_year,
+            bus_route, subway_station, hojae_list,
+        )
+        items = [_mock_to_property(p) for p in filtered]
+        is_mock = True
+
+    return {"total": len(items), "items": items, "is_mock": is_mock}
+
+
+def _filter_mock(
+    max_walk_minutes=None, min_units=None, max_units=None,
+    min_price=None, max_price=None,
+    min_built_year=None, max_built_year=None,
+    bus_route=None, subway_station=None, hojae_list=None,
+) -> list[dict]:
+    results = list(PROPERTIES)
+    if max_walk_minutes is not None:
+        results = [p for p in results if p["walk_minutes"] <= max_walk_minutes]
+    if min_units is not None:
+        results = [p for p in results if p["units"] >= min_units]
+    if max_units is not None:
+        results = [p for p in results if p["units"] <= max_units]
+    if min_price is not None:
+        results = [p for p in results if p["price"] >= min_price]
+    if max_price is not None:
+        results = [p for p in results if p["price"] <= max_price]
+    if min_built_year is not None:
+        results = [p for p in results if p["built_year"] >= min_built_year]
+    if max_built_year is not None:
+        results = [p for p in results if p["built_year"] <= max_built_year]
+    if subway_station:
+        results = [p for p in results if subway_station in p["nearest_subway"]]
+    if bus_route:
+        results = [p for p in results if any(bus_route in b for b in p["bus_routes"])]
+    if hojae_list:
+        results = [p for p in results if any(t in p.get("hojaes", []) for t in hojae_list)]
+    return results
+
+
+@router.get("/dongs")
+def get_dongs(lawd_cd: str = ""):
+    """특정 구의 동 목록 반환"""
+    if not _use_db():
+        return {"dongs": []}
+    import database as db
+    conn = db.get_db()
+    if lawd_cd:
+        codes = [c.strip() for c in lawd_cd.split(",") if c.strip()]
+        placeholders = ",".join("?" * len(codes))
+        rows = conn.execute(
+            f"SELECT DISTINCT dong FROM apartments WHERE lawd_cd IN ({placeholders}) AND geocoded=1 AND last_price>0 AND dong!='' ORDER BY dong",
+            codes
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT DISTINCT dong FROM apartments WHERE geocoded=1 AND last_price>0 AND dong!='' ORDER BY dong"
+        ).fetchall()
+    conn.close()
+    return {"dongs": [r[0] for r in rows]}
+
+
+@router.get("/meta/filters")
+def get_filter_meta():
+    if _use_db():
+        meta = db_module.get_meta()
+        return {
+            "min_price":      meta.get("min_price", 10000),
+            "max_price":      meta.get("max_price", 500000),
+            "min_units":      meta.get("min_units", 0),
+            "max_units":      meta.get("max_units", 10000),
+            "min_built_year": meta.get("min_built_year", 1985),
+            "max_built_year": meta.get("max_built_year", 2026),
+            "min_walk":       meta.get("min_walk", 1),
+            "max_walk":       meta.get("max_walk", 30),
+            "is_mock":        False,
+        }
+    prices = [p["price"] for p in PROPERTIES]
+    years  = [p["built_year"] for p in PROPERTIES]
+    units  = [p["units"] for p in PROPERTIES]
+    walks  = [p["walk_minutes"] for p in PROPERTIES]
+    return {
+        "price":       {"min": min(prices), "max": max(prices)},
+        "units":       {"min": min(units),  "max": max(units)},
+        "built_year":  {"min": min(years),  "max": max(years)},
+        "walk_minutes":{"min": min(walks),  "max": max(walks)},
+        "bus_routes":  sorted({b for p in PROPERTIES for b in p["bus_routes"]}),
+        "hojaes":      sorted({t for p in PROPERTIES for t in p.get("hojaes", [])}),
+        "is_mock":     True,
+    }
+
+
+@router.get("/{property_id}")
+def get_property(property_id: int):
+    if _use_db():
+        row = db_module.get_apartment_by_id(property_id)
+        if row:
+            return _db_to_property(row)
+    for p in PROPERTIES:
+        if p["id"] == property_id:
+            return _mock_to_property(p)
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404, detail="매물을 찾을 수 없습니다")
