@@ -67,46 +67,54 @@ def _find_apartment(q: str) -> dict | None:
         qn = qn_raw
 
     conn = db_module.get_db()
+    match_type = None
+    match_score = None
+
     # 1순위: 정확/부분 매칭
     row = conn.execute(
-        "SELECT * FROM apartments WHERE geocoded=1 AND last_price>0 AND area_m2 BETWEEN 1 AND 85 "
+        "SELECT * FROM apartments WHERE geocoded=1 AND last_price>0 AND area_m2 BETWEEN 1 AND 90 "
         "AND (REPLACE(COALESCE(display_name,''), ' ', '') LIKE ? "
         "     OR REPLACE(name, ' ', '') LIKE ?) "
         "ORDER BY last_price DESC LIMIT 1",
         (f"%{qn}%", f"%{qn}%"),
     ).fetchone()
+    if row:
+        match_type = "exact"
 
-    # 2순위: 퍼지 매칭 (오타·표기 차이 대응)
+    # 2순위: 퍼지 매칭 (오타·표기 차이 대응) — 후보 단지명이 의미있는 길이일 때만
     if not row:
         all_rows = conn.execute(
             "SELECT id, COALESCE(display_name, name) AS dn FROM apartments "
-            "WHERE geocoded=1 AND last_price>0 AND area_m2 BETWEEN 1 AND 85"
+            "WHERE geocoded=1 AND last_price>0 AND area_m2 BETWEEN 1 AND 90"
         ).fetchall()
         scored = []
         for r in all_rows:
             cand = (r["dn"] or "").replace(" ", "")
-            if len(cand) < 2:
+            if len(cand) < 4:        # 짧은 후보(2~3자)는 substring 우연 매칭 방지
                 continue
             score = difflib.SequenceMatcher(None, qn, cand).ratio()
-            # 입력이 후보의 부분일 때 가중치
-            if qn in cand or cand in qn:
+            # substring 가중치는 양쪽 모두 4자 이상이고 후보가 입력의 60%+ 일 때만
+            if (qn in cand or cand in qn) and len(cand) >= max(4, len(qn) * 0.6):
                 score = max(score, 0.7)
-            if score >= 0.55:
+            if score >= 0.6:         # 임계값 0.55 → 0.6 (더 엄격)
                 scored.append((score, r["id"]))
         if scored:
             scored.sort(reverse=True)
-            row = conn.execute("SELECT * FROM apartments WHERE id=?", (scored[0][1],)).fetchone()
+            best_score, best_id = scored[0]
+            row = conn.execute("SELECT * FROM apartments WHERE id=?", (best_id,)).fetchone()
+            match_type = "fuzzy"
+            match_score = round(best_score, 2)
 
     conn.close()
     if not row:
         return None
     apt = db_module.row_to_dict(row)
-    # 입력이 단지명 절반 미만이면 region 의도 → 매칭 무효화
     dn = (apt.get("display_name") or apt.get("name") or "").replace(" ", "")
     if dn and len(qn) / max(len(dn), 1) < 0.5:
-        # 단, 퍼지 매칭 점수가 높았으면 유지
         if not (qn in dn or dn in qn):
             return None
+    apt["_match_type"]  = match_type
+    apt["_match_score"] = match_score
     return apt
 
 
@@ -142,17 +150,54 @@ def _region_stats(region: str) -> dict:
             "max_price":  round((r[7] or 0) / 10000, 1),
         }
 
-    s50 = _fmt(_q(50, 59.99))
-    s80 = _fmt(_q(80, 89.99))
+    s50 = _fmt(_q(50, 60))
+    s80 = _fmt(_q(80, 90))
     conn.close()
     return {"s50": s50, "s80": s80}
 
 
+# 대형마트로 인정할 브랜드 (이마트 트레이더스/노브랜드는 별도 → 본점 이마트만)
+MART_BRANDS = ("이마트", "홈플러스", "롯데마트", "코스트코")
+
+
 async def _count_infra(client: httpx.AsyncClient, lat: float, lng: float, code: str, radius: int = 1000) -> int:
-    """카카오 카테고리 검색으로 반경 내 시설 수"""
+    """카카오 카테고리 검색으로 반경 내 시설 수
+    - MT1(대형마트)는 이마트/홈플러스/롯데마트/코스트코 본점만 카운트
+      (SSG·하나로마트·노브랜드·이마트에브리데이 등은 제외)
+    """
     if not (lat and lng):
         return 0
     try:
+        # 대형마트는 결과 페이지 직접 받아 브랜드 필터
+        if code == "MT1":
+            r = await client.get(
+                "https://dapi.kakao.com/v2/local/search/category.json",
+                headers=KAKAO_HEADERS,
+                params={"category_group_code": code, "x": lng, "y": lat,
+                        "radius": radius, "size": 15, "sort": "distance"},
+                timeout=8,
+            )
+            if r.status_code != 200:
+                return 0
+            docs = r.json().get("documents", [])
+            seen = set()
+            n = 0
+            for d in docs:
+                name = d.get("place_name") or ""
+                # 노브랜드·이마트에브리데이·이마트24 등 변종 제외
+                if "노브랜드" in name or "에브리데이" in name or "이마트24" in name:
+                    continue
+                if not any(b in name for b in MART_BRANDS):
+                    continue
+                # 같은 점포 중복(주차장 등) 방지 — 이름 정규화로 dedup
+                key = name.split()[0] if " " in name else name
+                if key in seen:
+                    continue
+                seen.add(key)
+                n += 1
+            return n
+
+        # 그 외 카테고리는 total_count 그대로
         r = await client.get(
             "https://dapi.kakao.com/v2/local/search/category.json",
             headers=KAKAO_HEADERS,
@@ -243,6 +288,8 @@ async def _collect_for(target: str) -> dict:
         "infra":        infra,
         "region":       region,
         "region_stats": region_stats,
+        "match_type":   (apt or {}).get("_match_type"),
+        "match_score":  (apt or {}).get("_match_score"),
     }
 
 
@@ -267,9 +314,30 @@ COMPARE_SYSTEM = """당신은 시장 인사이더 수준의 부동산 깊이 분
 ■ **일반론·교과서적 설명 금지** — "교통이 편리하다" (X) → "9호선 등촌역 도보 5분 + 5호선 우장산 도보 12분 더블역세권" (O)
 
 출력 형식:
-- categories[8~12개]: 재건축 진행단계, 교통 호재, 상업·인프라 호재, 학군·교육, 시세(50대), 시세(80대), 거주 분위기, 미래가치 등
+- categories[8~12개]: 재건축 진행단계, 교통 인프라, 상업·인프라 호재, 학군·교육, 시세 및 가격경쟁력, 거주 분위기, 미래가치 등
   evaluations[i].summary는 구체 사실 + 시점 + 단계 + 고유명사 포함, 100자 이상 권장
   tier는 "상"/"중"/"하" — 그 항목에서 i번째 대상의 상대적 우위
+
+■ **카테고리별 tier 산정 기준 (반드시 준수)**:
+  • **교통 인프라**: 단순 "1km 내 역 N개" 카운트가 아니라 다음 가중치로 평가
+    1) 가장 가까운 역까지 도보 시간 (도보 3분 이내 ★★★ / 5분 이내 ★★ / 10분 이내 ★ / 그 외 ✗)
+    2) 환승 가능 노선 수 (더블·트리플 역세권 우대)
+    3) 버스 노선의 직결 목적지 다양성 — 한 번 환승 없이 갈 수 있는 핵심지(강남·여의도·광화문·홍대·용산) 개수
+    4) 신규 노선·GTX 등 미래 교통 호재
+    역 개수만 많아도 멀거나 잡 노선뿐이면 "중/하". 도보 3분 이내 + 다중 환승 + 강남·홍대 직통 버스면 "상".
+  • **재건축 가치**: 다음 3가지 종합 평가
+    1) 대지지분 (㎡): 높을수록 환급 평수 큼 — 25㎡ 이상 ★★★ / 18~25㎡ ★★ / 12~18㎡ ★ / 12㎡ 미만 ✗
+    2) 용적률: 낮을수록 재건축 사업성 큼 — 180% 이하 ★★★ / 200% 이하 ★★ / 250% 이하 ★ / 그 외 ✗
+    3) 현재 단계: 안전진단·정비구역지정·조합설립·시공사선정·사업시행인가·관리처분·이주철거·착공·준공
+    셋 종합으로 "상/중/하". 대지지분 25㎡ + 용적률 180% + 사업시행인가 이상이면 "상".
+    summary에 반드시 대지지분 수치(예: "대지지분 28㎡, 용적률 178%, 조합설립 단계")와 단계 명시.
+  • **시세 및 가격경쟁력**: 평당가가 낮을수록 "상" (저평가/매수기회 관점).
+    - 평당가 = (실거래가 × 3.3) / 면적㎡. 같은 평형대(50대 또는 80대) 내에서 평당가 비교.
+    - 가장 낮은 평당가 = "상" (가격경쟁력 우위 / 추가 상승 여력)
+    - 중간 = "중"
+    - 가장 높은 평당가 = "하" (이미 프리미엄 반영)
+    - summary에 반드시 평당가 수치(예: "평당 6,750만원") 명시.
+    - 단, 동일 입지에서 신축이라 비싼 경우는 별도 코멘트.
 - pros[i]: 각 대상의 차별화 포인트 (수치·고유명사 포함, 3~6개)
 - rumors[i]: 카페·블로그 미확정 소문 (없으면 빈 배열). 각 소문에 topic·detail·source 명시
 - recommended_for[i]: 구체적 사용자 프로필·투자 전략
@@ -340,11 +408,34 @@ def _meta(d: dict) -> str:
     a = d.get("apt")
     if not a:
         return f"단지 매칭 없음 — '{d['label']}' 지역 기반 분석"
+    # 평당가 계산 — (실거래가 만원 × 3.3) / 면적㎡ → 평당 만원
+    pyeong = ""
+    if a.get("last_price") and a.get("area_m2"):
+        try:
+            ppy = round(a["last_price"] * 3.3 / a["area_m2"])
+            pyeong = f" | 평당 {ppy:,}만원"
+        except Exception:
+            pass
+    # 버스 노선 — 우리 DB에 있는 것 일부 (실제 직결 목적지는 AI가 노선번호 보고 추론)
+    buses = a.get("bus_routes") or []
+    if isinstance(buses, str):
+        try:
+            import json as _j
+            buses = _j.loads(buses)
+        except Exception:
+            buses = []
+    bus_str = f" | 버스 {', '.join(buses[:6])}" if buses else ""
+    # 대지지분 (이론): 공급면적(전용/0.75) / (용적률/100) = area_m2 × 133.3 / far
+    land_str = ""
+    if a.get("far") and a["far"] > 0 and a.get("area_m2"):
+        ls = round(a["area_m2"] * 133.3 / a["far"], 1)
+        land_str = f" | 대지지분 {ls}㎡ ({ls*0.3025:.1f}평, {a['area_m2']:.0f}㎡·용적률{a['far']}% 기준)"
+    builder_str = f" | 시공사 {a['builder']}" if a.get("builder") else ""
     return (f"단지명: {a.get('display_name') or a['name']} | 주소: {a['address']}\n"
-            f"  실거래가 {a['last_price']/10000:.1f}억 ({a['area_m2']}㎡, {a.get('last_deal_date') or '-'}) | "
-            f"세대수 {a.get('units') or '-'} | 연식 {a.get('built_year') or '-'}년 | "
-            f"용적률 {a.get('far') or '-'}% | "
-            f"가까운역 {a.get('nearest_subway') or '-'} 도보 {a.get('walk_minutes') or '-'}분")
+            f"  실거래가 {a['last_price']/10000:.1f}억 ({a['area_m2']}㎡, {a.get('last_deal_date') or '-'}){pyeong}\n"
+            f"  세대수 {a.get('units') or '-'} | 연식 {a.get('built_year') or '-'}년 | "
+            f"용적률 {a.get('far') or '-'}%{land_str}{builder_str}\n"
+            f"  가까운역 {a.get('nearest_subway') or '-'} {a.get('subway_line') or ''} 도보 {a.get('walk_minutes') or '-'}분{bus_str}")
 
 
 def _stats_text(d: dict) -> str:
@@ -417,14 +508,27 @@ async def compare(
     try:
         resp = await _anthropic.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=8192,
+            max_tokens=12000,           # 8192 → 12000 (강화된 기준으로 응답 더 길어짐)
             system=[{"type": "text", "text": COMPARE_SYSTEM,
                      "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content": user_msg}],
             output_config={"format": {"type": "json_schema", "schema": COMPARE_SCHEMA}},
         )
         text_block = next((blk.text for blk in resp.content if blk.type == "text"), "")
-        result = json.loads(text_block)
+        try:
+            result = json.loads(text_block)
+        except json.JSONDecodeError as je:
+            # 출력 잘림 → 끝에서부터 균형 잡힌 } 찾기
+            print(f"[compare] JSON 파싱 1차 실패 ({je}). 부분 복구 시도...")
+            result = None
+            for end in range(len(text_block), 0, -50):
+                try:
+                    result = json.loads(text_block[:end])
+                    break
+                except Exception:
+                    continue
+            if not result:
+                return {"error": f"AI 응답이 너무 길어 잘렸습니다. 다시 시도하거나 비교 대상을 2개로 줄여주세요. ({je})"}
     except Exception as e:
         return {"error": f"분석 실패: {e}"}
 
@@ -436,6 +540,8 @@ async def compare(
                 "items_count":  len(d["items"]),
                 "region_stats": d["region_stats"],
                 "infra":        d["infra"],
+                "match_type":   d["match_type"],
+                "match_score":  d["match_score"],
             }
             for d in data_list
         ],

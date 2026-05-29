@@ -171,6 +171,42 @@ export default function FilterPanel({ filters, onChange, total, loading, onGuSel
 
         <hr className="border-gray-100" />
 
+        {/* 평형대 */}
+        <section>
+          <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-gray-800">
+            📐 평형대
+          </h2>
+          <div className="flex gap-2">
+            {[
+              { code: '50', label: '50㎡대', range: '50~60㎡' },
+              { code: '80', label: '80㎡대', range: '80~90㎡' },
+            ].map(({ code, label, range }) => {
+              const bands = filters.areaBands ?? []
+              const active = bands.includes(code)
+              return (
+                <button
+                  key={code}
+                  onClick={() => {
+                    const next = active ? bands.filter(b => b !== code) : [...bands, code]
+                    onChange({ ...filters, areaBands: next })
+                  }}
+                  className={`flex-1 rounded-lg border px-3 py-2 text-xs font-medium transition-all ${
+                    active
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
+                  }`}
+                >
+                  <div className="font-bold">{label}</div>
+                  <div className={`text-[10px] mt-0.5 ${active ? 'text-blue-100' : 'text-gray-400'}`}>{range}</div>
+                </button>
+              )
+            })}
+          </div>
+          <p className="mt-1 text-xs text-gray-400">선택 시 해당 평형 거래만 표시</p>
+        </section>
+
+        <hr className="border-gray-100" />
+
         {/* 구 선택 (다중) */}
         <section>
           <h2 className="mb-1.5 flex items-center justify-between text-sm font-semibold text-gray-800">
@@ -329,21 +365,21 @@ export default function FilterPanel({ filters, onChange, total, loading, onGuSel
           <div className="flex justify-between text-xs text-gray-500 mb-1">
             <span>범위</span>
             <span className="font-medium text-gray-700">
-              {formatPrice(filters.minPrice ?? 10000)} ~ {formatPrice(filters.maxPrice ?? 200000)}
+              {formatPrice(filters.minPrice ?? 50000)} ~ {formatPrice(filters.maxPrice ?? 200000)}
             </span>
           </div>
           <div className="flex gap-2">
-            <input type="range" min={10000} max={200000} step={5000}
-              value={filters.minPrice ?? 10000}
+            <input type="range" min={50000} max={200000} step={5000}
+              value={filters.minPrice ?? 50000}
               onChange={e => { const v = Number(e.target.value); if (v <= (filters.maxPrice ?? 200000)) set('minPrice', v) }}
               className="w-full accent-blue-600" />
-            <input type="range" min={10000} max={200000} step={5000}
+            <input type="range" min={50000} max={200000} step={5000}
               value={filters.maxPrice ?? 200000}
-              onChange={e => { const v = Number(e.target.value); if (v >= (filters.minPrice ?? 10000)) set('maxPrice', v) }}
+              onChange={e => { const v = Number(e.target.value); if (v >= (filters.minPrice ?? 50000)) set('maxPrice', v) }}
               className="w-full accent-blue-600" />
           </div>
           <div className="flex justify-between text-xs text-gray-400 mt-0.5">
-            <span>1억</span><span>20억</span>
+            <span>5억</span><span>20억</span>
           </div>
         </section>
 

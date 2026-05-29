@@ -27,6 +27,12 @@ backend/check_*.py
 backend/test_*.py
 backend/slope_out.log
 backend/slope_err.log
+backend/*_log.txt
+backend/*_log2.txt
+backend/*_err.txt
+backend/*_err2.txt
+backend/uvicorn_*.txt
+backend/scripts/_*.py
 
 # IDE
 .vscode/
@@ -36,3 +42,4 @@ Thumbs.db
 
 # Claude
 .claude/
+backend/apartments.db

@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import CaptureButtons from './CaptureButtons'
+import MiniPriceChart from './MiniPriceChart'
 
 function fmtPrice(manwon) {
   if (!manwon) return '-'
@@ -18,6 +20,28 @@ export default function CompareModal({ open, onClose }) {
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
+  const [trends, setTrends] = useState({})   // { [targetIdx]: trend[] }
+  const captureRef = useRef(null)
+
+  // 데이터 로드되면 각 단지별 트렌드 fetch
+  useEffect(() => {
+    if (!data?.targets) return
+    let cancelled = false
+    setTrends({})
+    data.targets.forEach((side, i) => {
+      if (!side.apt?.id) return
+      ;(async () => {
+        try {
+          const r = await fetch(`/api/properties/${side.apt.id}/trend`)
+          const j = await r.json()
+          if (!cancelled) setTrends(prev => ({ ...prev, [i]: j.trend || [] }))
+        } catch {
+          if (!cancelled) setTrends(prev => ({ ...prev, [i]: [] }))
+        }
+      })()
+    })
+    return () => { cancelled = true }
+  }, [data])
 
   function setTarget(i, v) {
     const next = [...targets]; next[i] = v; setTargets(next)
@@ -61,7 +85,10 @@ export default function CompareModal({ open, onClose }) {
             <h2 className="text-lg font-bold text-gray-900">⚖️ 단지·지역 비교 분석</h2>
             <p className="text-xs text-gray-400 mt-0.5">단지명(예: 신길우성2차) 또는 지역명(예: 신길, 마포) — 최대 3개</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+          <div className="flex items-center gap-2">
+            {data && <CaptureButtons targetRef={captureRef} filename={`비교_${(data.targets||[]).map(t=>t.label).join('_vs_')}.png`} />}
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none ml-1">✕</button>
+          </div>
         </div>
 
         {/* 입력 */}
@@ -126,7 +153,9 @@ export default function CompareModal({ open, onClose }) {
           )}
 
           {data && (
-            <div className="space-y-4">
+            <div ref={captureRef} className="space-y-4 bg-white p-4 rounded-xl">
+              {/* 캡처용 상단 타이틀 (모달엔 안 보이는 느낌이지만 이미지엔 들어감) */}
+              <div className="hidden">⚖️ 단지·지역 비교 분석</div>
               {/* 헤드라인 */}
               <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-3">
                 <p className="text-sm font-bold text-gray-900">{data.comparison.headline}</p>
@@ -140,6 +169,12 @@ export default function CompareModal({ open, onClose }) {
                       <span className="text-xs font-bold text-blue-600">{String.fromCharCode(65 + i)}</span>
                       <p className="font-bold text-gray-900 text-sm">{side.label}</p>
                     </div>
+                    {side.match_type === 'fuzzy' && side.apt && (
+                      <div className="mt-1.5 rounded-md bg-amber-50 border border-amber-200 px-2 py-1.5 text-xs text-amber-800">
+                        ⚠ 입력과 정확히 일치하는 단지가 없어 <b>"{side.apt.display_name || side.apt.name}"</b>로 추정 분석했습니다
+                        {side.match_score && <span className="text-amber-500 ml-1">(유사도 {Math.round(side.match_score*100)}%)</span>}
+                      </div>
+                    )}
                     {side.apt ? (
                       <div className="mt-2 text-xs text-gray-600 space-y-0.5">
                         <p>📍 {side.apt.address}</p>
@@ -172,6 +207,13 @@ export default function CompareModal({ open, onClose }) {
                         ) : (
                           <p className="text-gray-400 px-2">80㎡대: 거래 없음</p>
                         )}
+                      </div>
+                    )}
+
+                    {/* 미니 실거래가 추이 */}
+                    {side.apt && trends[i] !== undefined && (
+                      <div className="mt-2 pt-2 border-t border-gray-100">
+                        <MiniPriceChart trend={trends[i]} height={70} title="최근 24개월 시세" />
                       </div>
                     )}
 

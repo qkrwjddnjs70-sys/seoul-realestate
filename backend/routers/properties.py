@@ -114,6 +114,20 @@ def _db_to_property(row: dict) -> dict:
         "transaction_date": row["last_deal_date"],
         "lawd_cd":        row["lawd_cd"],
         "hojaes":         row["hojaes"],
+        "naver_id":      row.get("naver_id") or "",
+        # 대지지분(이론): 공급면적(전용/0.75) ÷ (용적률/100)
+        #   = area_m2 × 133.3 / far
+        #   예: 59㎡ + far 246% → 32.1㎡
+        "land_share":    (
+            round(row["area_m2"] * 133.3 / row["far"], 1)
+            if (row.get("far") and row["far"] > 0 and row.get("area_m2"))
+            else 0
+        ),
+        "lot_area":      row.get("lot_area") or 0,   # K-apt 단지 부지 (참고용)
+        "builder":       row.get("builder") or "",
+        "redev_stage":   row.get("redev_stage") or "",
+        "redev_detail":  row.get("redev_detail") or "",
+        "redev_updated": row.get("redev_updated") or "",
         "commute": {
             "gangnam":     row.get("time_gangnam", 0),
             "yeouido":     row.get("time_yeouido", 0),
@@ -150,6 +164,7 @@ def get_properties(
     lng_center:          Optional[float] = Query(None),
     lawd_cd:             Optional[str]   = Query(None),
     dong:                Optional[str]   = Query(None),
+    area_bands:          Optional[str]   = Query(None),
     bounds_size:         Optional[float] = Query(None),
 ):
     hojae_list = [t.strip() for t in hojaes.split(",") if t.strip()] if hojaes else None
@@ -173,6 +188,7 @@ def get_properties(
             lat_center=lat_center, lng_center=lng_center,
             lawd_cd=lawd_cd,
             dong=dong,
+            area_bands=area_bands,
             bounds_size=bounds_size,
         )
         items = [_db_to_property(r) for r in rows]
@@ -282,3 +298,39 @@ def get_property(property_id: int):
             return _mock_to_property(p)
     from fastapi import HTTPException
     raise HTTPException(status_code=404, detail="매물을 찾을 수 없습니다")
+
+
+@router.patch("/{property_id}/manual")
+def patch_manual(property_id: int, payload: dict):
+    """단지 정보 수동 입력 — 사용자가 직접 알려주는 정확한 값 저장
+    payload: { "far": 240.0, "units": 417 } 등. 입력 즉시 manual 플래그 ON
+    그러면 enrich 스크립트들이 해당 값을 덮어쓰지 않음.
+    """
+    from fastapi import HTTPException
+    if not _use_db():
+        raise HTTPException(status_code=503, detail="DB 미사용")
+    allowed = {
+        "far":   "far",
+        "units": "units",
+    }
+    sets, vals = [], []
+    for k, col in allowed.items():
+        if k in payload and payload[k] is not None:
+            try:
+                v = float(payload[k]) if k == "far" else int(payload[k])
+                if v < 0: continue
+                sets.append(f"{col}=?"); vals.append(v)
+                sets.append(f"{col}_manual=1")
+            except Exception:
+                pass
+    if not sets:
+        raise HTTPException(status_code=400, detail="입력값이 없습니다")
+    conn = db_module.get_db()
+    vals.append(property_id)
+    conn.execute(f"UPDATE apartments SET {', '.join(sets)} WHERE id=?", vals)
+    conn.commit()
+    row = conn.execute("SELECT * FROM apartments WHERE id=?", (property_id,)).fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="단지 없음")
+    return _db_to_property(dict(row))

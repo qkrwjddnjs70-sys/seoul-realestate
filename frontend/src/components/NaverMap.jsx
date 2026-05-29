@@ -19,9 +19,22 @@ function createMarkerIcon(p, isSelected) {
   const { bg, border } = priceColor(p.price)
   const outline = isSelected ? '#fff' : border
   const scale = isSelected ? 'scale(1.2)' : 'scale(1)'
+  // 준공된 단지는 진행 끝났으므로 별 제외
+  const inProgress = p.redev_stage && p.redev_stage !== '준공'
+  const star = inProgress
+    ? `<div title="재건축: ${p.redev_stage}" style="position:absolute;right:-10px;top:-14px;z-index:5;
+                  width:20px;height:20px;line-height:0;
+                  filter:drop-shadow(0 1px 3px rgba(0,0,0,0.5));">
+          <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+            <polygon points="12,2 15,9 22,9.5 17,14.5 18.5,22 12,18 5.5,22 7,14.5 2,9.5 9,9"
+                     fill="#a855f7" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>
+          </svg>
+       </div>`
+    : ''
   return L.divIcon({
     html: `
       <div style="position:relative;display:inline-block;line-height:0;transform:${scale};transform-origin:center bottom;">
+        ${star}
         <div style="position:absolute;left:50%;top:-6px;transform:translateX(-50%);width:0;height:0;
                     border-left:10px solid transparent;border-right:10px solid transparent;
                     border-bottom:9px solid ${outline};z-index:1;"></div>

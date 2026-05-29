@@ -139,8 +139,12 @@ async def main():
     total_updated = 0
     async with httpx.AsyncClient(timeout=30) as client:
         for lawd_cd, gu_name in SEOUL_GU.items():
+            # 미보강 단지만 처리 (이미 far 있거나 수동 입력된 단지는 skip)
             rows = conn.execute(
-                "SELECT id, name FROM apartments WHERE lawd_cd=? AND geocoded=1",
+                "SELECT id, name, display_name FROM apartments "
+                "WHERE lawd_cd=? AND geocoded=1 AND last_price>0 "
+                "AND (far IS NULL OR far=0) "
+                "AND (far_manual IS NULL OR far_manual=0)",
                 (lawd_cd,)
             ).fetchall()
             if not rows:
@@ -151,7 +155,8 @@ async def main():
 
             updated = 0
             for row in rows:
-                pnu = match_pnu(row["name"], pnu_map)
+                # display_name도 시도 (동 접두어가 매칭 키일 수 있음)
+                pnu = match_pnu(row["name"], pnu_map) or match_pnu(row["display_name"], pnu_map)
                 if not pnu:
                     continue
                 far = await fetch_far(client, pnu)

@@ -3,6 +3,9 @@ import FilterPanel, { HOJAE_STYLE } from './components/FilterPanel'
 import NaverMap from './components/NaverMap'
 import PropertyDetail from './components/PropertyDetail'
 import CompareModal from './components/CompareModal'
+import AiFilterModal from './components/AiFilterModal'
+import CaptureButtons from './components/CaptureButtons'
+import MiniPriceChart from './components/MiniPriceChart'
 import { useProperties } from './hooks/useProperties'
 
 export default function App() {
@@ -11,13 +14,25 @@ export default function App() {
   const [detailProperty, setDetailProperty] = useState(null)
   const [listOpen, setListOpen] = useState(true)
   const [mapBounds, setMapBounds] = useState(null)
+  const [searchBounds, setSearchBounds] = useState(null)   // 수동 "현재 화면 검색" 결과
   const [compareOpen, setCompareOpen] = useState(false)
   const [hojaeOpen, setHojaeOpen] = useState(false)
+  const [aiFilterOpen, setAiFilterOpen] = useState(false)
 
   const { properties, total, loading } = useProperties(filters, mapBounds)
 
-  // 서버에서 이미 bounds 필터링 → 프론트는 그대로 사용
-  const visibleProperties = properties
+  // 하단 목록 = "현재 화면 검색" 버튼이 마지막으로 잡은 영역의 단지만
+  const visibleProperties = searchBounds
+    ? properties.filter(p =>
+        p.lat >= searchBounds.south && p.lat <= searchBounds.north &&
+        p.lng >= searchBounds.west  && p.lng <= searchBounds.east
+      )
+    : []
+
+  // 첫 로드 시 자동으로 한 번 잡아주기
+  useEffect(() => {
+    if (mapBounds && !searchBounds) setSearchBounds(mapBounds)
+  }, [mapBounds, searchBounds])
 
   function handleMarkerClick(property) {
     setSelectedProperty(prev => prev?.id === property.id ? null : property)
@@ -94,6 +109,22 @@ export default function App() {
             ⚖️ 단지·지역 비교
           </button>
 
+          {/* 종합 AI 분석 버튼 — 비교 분석 위 */}
+          <button
+            onClick={() => setAiFilterOpen(true)}
+            className="absolute bottom-[152px] right-4 z-[1000] flex items-center gap-1.5 rounded-full bg-purple-600 hover:bg-purple-700 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors"
+          >
+            🤖 종합 AI 분석
+          </button>
+
+          {/* 현재 화면 검색 버튼 — 가장 아래(목록 보기 위) */}
+          <button
+            onClick={() => mapBounds && setSearchBounds({ ...mapBounds })}
+            className="absolute bottom-14 left-4 z-[1000] flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors"
+          >
+            🔍 현재 화면 검색
+          </button>
+
           <button
             onClick={() => setListOpen(p => !p)}
             className="absolute bottom-4 right-4 z-[1000] rounded-full bg-white px-4 py-2 text-sm font-medium shadow-lg hover:bg-gray-50 transition-colors border border-gray-200"
@@ -109,12 +140,12 @@ export default function App() {
           <div className="h-72 shrink-0 border-t border-gray-200 bg-white">
             <div className="flex items-center justify-between border-b border-gray-100 px-4 py-2">
               <span className="text-sm font-medium text-gray-700">
-                {mapBounds
-                  ? <>현재 화면 <span className="text-blue-600">{visibleProperties.length}건</span> <span className="text-gray-400 text-xs">(전체 {total}건)</span></>
+                {searchBounds
+                  ? <>검색 영역 <span className="text-blue-600">{visibleProperties.length}건</span> <span className="text-gray-400 text-xs">(전체 {total}건)</span></>
                   : <>매물 목록 <span className="text-blue-600">{total}건</span></>
                 }
               </span>
-              <span className="text-xs text-gray-400">지도 이동 시 자동 갱신</span>
+              <span className="text-xs text-gray-400">🔍 버튼 누른 영역 기준</span>
             </div>
             <div className="h-[calc(100%-41px)] overflow-y-auto">
               <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -160,6 +191,14 @@ export default function App() {
 
       {/* 비교 분석 모달 */}
       <CompareModal open={compareOpen} onClose={() => setCompareOpen(false)} />
+
+      {/* 종합 AI 분석 모달 */}
+      <AiFilterModal
+        open={aiFilterOpen}
+        onClose={() => setAiFilterOpen(false)}
+        onSelectProperty={setSelectedProperty}
+        onLocateProperty={(p) => mapRef.current?.flyTo(p.lat, p.lng, 16)}
+      />
     </div>
   )
 }
@@ -168,15 +207,17 @@ export default function App() {
 function HojaeModal({ property, open, onClose }) {
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState(null)
+  const [trend, setTrend] = useState(null)
+  const captureRef = useRef(null)
 
   // property 바뀌면 데이터 리셋
-  useEffect(() => { setData(null) }, [property?.id])
+  useEffect(() => { setData(null); setTrend(null) }, [property?.id])
 
-  // 모달 열릴 때 자동으로 검색 시작
+  // 모달 열릴 때 자동으로 검색 시작 + 시세 트렌드 fetch
   useEffect(() => {
     if (!open || !property) return
     let cancelled = false
-    setLoading(true); setData(null)
+    setLoading(true); setData(null); setTrend(null)
     ;(async () => {
       try {
         const dong = property.address?.match(/(\S+동|\S+가)/)?.[1] ?? ''
@@ -188,6 +229,15 @@ function HojaeModal({ property, open, onClose }) {
         if (!cancelled) setData({ items: [], query: '' })
       } finally {
         if (!cancelled) setLoading(false)
+      }
+    })()
+    ;(async () => {
+      try {
+        const r = await fetch(`/api/properties/${property.id}/trend`)
+        const j = await r.json()
+        if (!cancelled) setTrend(j.trend || [])
+      } catch {
+        if (!cancelled) setTrend([])
       }
     })()
     return () => { cancelled = true }
@@ -209,11 +259,21 @@ function HojaeModal({ property, open, onClose }) {
                 <p className="font-bold text-gray-900">{property.name} 인근 호재</p>
                 <p className="text-xs text-gray-400 mt-0.5">{property.address}</p>
               </div>
-              <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+              <div className="flex items-center gap-2">
+                <CaptureButtons targetRef={captureRef} filename={`호재_${property.name}.png`} />
+                <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none ml-1">✕</button>
+              </div>
             </div>
 
             {/* 본문 */}
-            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3" ref={captureRef}>
+              {/* 미니 실거래가 추이 */}
+              {trend !== null && (
+                <div className="rounded-xl border border-gray-100 bg-white p-3">
+                  <MiniPriceChart trend={trend} />
+                </div>
+              )}
+
               {loading && (
                 <div className="flex flex-col items-center py-10 text-gray-400">
                   <div className="animate-spin text-3xl mb-2">🔍</div>

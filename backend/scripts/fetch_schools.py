@@ -13,10 +13,16 @@ KAKAO_KEY = os.getenv("KAKAO_REST_KEY", "")
 HEADERS = {"Authorization": f"KakaoAK {KAKAO_KEY}"}
 URL = "https://dapi.kakao.com/v2/local/search/category.json"
 
-# 강서구 + 영등포구 포괄 영역
-LAT_MIN, LAT_MAX = 37.47, 37.61
-LNG_MIN, LNG_MAX = 126.77, 126.98
+# 서울 전체 25개 구 포괄 영역
+LAT_MIN, LAT_MAX = 37.42, 37.71
+LNG_MIN, LNG_MAX = 126.76, 127.20
 STEP = 0.02
+
+SEOUL_GUS = {
+    "종로구","중구","용산구","성동구","광진구","동대문구","중랑구","성북구",
+    "강북구","도봉구","노원구","은평구","서대문구","마포구","양천구","강서구",
+    "구로구","금천구","영등포구","동작구","관악구","서초구","강남구","송파구","강동구",
+}
 
 schools = {}
 
@@ -39,7 +45,9 @@ def fetch_cell(lng, lat):
         data = r.json()
         for doc in data.get("documents", []):
             addr = doc.get("address_name", "") or doc.get("road_address_name", "")
-            if "강서구" not in addr and "영등포구" not in addr:
+            # 서울 25개 구 중 하나에 속하는지 확인
+            gu_match = next((g for g in SEOUL_GUS if g in addr), None)
+            if not gu_match:
                 continue
             cat = doc.get("category_name", "")
             if "초등학교" in cat:   kind = "초"
@@ -52,7 +60,7 @@ def fetch_cell(lng, lat):
                 "lat":     float(doc["y"]),
                 "lng":     float(doc["x"]),
                 "address": addr,
-                "gu":      "강서구" if "강서구" in addr else "영등포구",
+                "gu":      gu_match,
             }
         if data.get("meta", {}).get("is_end", True):
             return

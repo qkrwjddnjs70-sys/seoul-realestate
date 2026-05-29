@@ -86,13 +86,26 @@ def get_apartments(
     lat_center=None, lng_center=None,
     lawd_cd=None,
     dong=None,
+    area_bands=None,    # "50,80" 등 — 50/80㎡대 필터
     bounds_size=None,   # lng_max - lng_min (뷰포트 크기)
     limit=800,
 ) -> list[dict]:
     conn = get_db()
-    # 가격 기준 통일: 면적 85㎡ 이하 거래만 표시
-    clauses = ["geocoded = 1", "last_price > 0", "area_m2 BETWEEN 1 AND 85"]
+    clauses = ["geocoded = 1"]
     params = []
+
+    # 평형대 필터 — 지정 시 그 평형대 거래가 있는 단지만 (band 컬럼 기준)
+    bands = []
+    if area_bands:
+        bands = [int(b.strip()) for b in area_bands.split(",") if b.strip().isdigit() and int(b.strip()) in (50, 80)]
+    if bands:
+        # 50/80 둘 중 하나라도 보유한 단지만
+        parts = [f"price_{b}>0" for b in bands]
+        clauses.append("(" + " OR ".join(parts) + ")")
+    else:
+        # 기본: 전체 (last_price 기준)
+        clauses.append("last_price > 0")
+        clauses.append("area_m2 BETWEEN 1 AND 90")
 
     if max_walk_minutes is not None:
         clauses.append("walk_minutes <= ?")
@@ -103,12 +116,14 @@ def get_apartments(
     if max_units is not None:
         clauses.append("(units = 0 OR units <= ?)")
         params.append(max_units)
-    if min_price is not None:
-        clauses.append("last_price >= ?")
-        params.append(min_price)
-    if max_price is not None:
-        clauses.append("last_price <= ?")
-        params.append(max_price)
+    # 가격 필터 — band 선택 시 SQL 단계에서 적용 X (Python 단에서 override 후 적용)
+    if not bands:
+        if min_price is not None:
+            clauses.append("last_price >= ?")
+            params.append(min_price)
+        if max_price is not None:
+            clauses.append("last_price <= ?")
+            params.append(max_price)
     if min_built_year is not None:
         clauses.append("(built_year = 0 OR built_year >= ?)")
         params.append(min_built_year)
@@ -183,6 +198,32 @@ def get_apartments(
     conn.close()
 
     results = [row_to_dict(r) for r in rows]
+
+    # band 선택 시 가격·면적·거래일을 band-specific 값으로 덮어쓰기 + min/max 필터
+    if bands:
+        filtered = []
+        for d in results:
+            best_p, best_a, best_d = 0, 0, ""
+            for b in bands:
+                p = d.get(f"price_{b}") or 0
+                if p > 0:
+                    dt = d.get(f"date_{b}") or ""
+                    if not best_d or dt > best_d:
+                        best_p = p
+                        best_a = d.get(f"area_{b}") or 0
+                        best_d = dt
+            if best_p <= 0:
+                continue
+            if min_price is not None and best_p < min_price:
+                continue
+            if max_price is not None and best_p > max_price:
+                continue
+            d["last_price"]     = best_p
+            d["area_m2"]        = best_a
+            d["last_deal_date"] = best_d
+            filtered.append(d)
+        results = filtered
+
     if hojaes:
         results = [r for r in results if any(t in r["hojaes"] for t in hojaes)]
 

@@ -25,8 +25,8 @@ SEOUL_GU = [
     "11620","11650","11680","11710","11740",
 ]
 
-MONTHS = 12
-MAX_AREA = 85.0
+MONTHS = 36
+MAX_AREA = 90.0
 
 
 async def fetch_ym(client, lawd_cd, ym):
