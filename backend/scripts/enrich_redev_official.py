@@ -167,7 +167,8 @@ def match_apartments(biz: dict[str, dict], conn: sqlite3.Connection) -> list[tup
     rows = conn.execute(
         "SELECT id, name, display_name, dong, lawd_cd, address, built_year "
         "FROM apartments WHERE geocoded=1 AND last_price>0 "
-        "AND built_year BETWEEN 1 AND 2004"
+        "AND built_year BETWEEN 1 AND 2004 "
+        "AND (redev_manual IS NULL OR redev_manual=0)"
     ).fetchall()
 
     # lawd_cd별 BIZ 인덱싱

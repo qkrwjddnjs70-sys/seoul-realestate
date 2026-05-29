@@ -33,6 +33,32 @@ export default function PropertyDetail({ property: initialProperty, onClose }) {
   const [farInput, setFarInput] = useState('')
   const [savingFar, setSavingFar] = useState(false)
 
+  const [editRedev, setEditRedev] = useState(false)
+  const [stageInput, setStageInput] = useState('')
+  const [detailInput, setDetailInput] = useState('')
+  const [savingRedev, setSavingRedev] = useState(false)
+
+  const REDEV_STAGES = [
+    '', '안전진단', '정비구역지정', '추진위원회승인', '조합설립인가',
+    '시공사선정', '사업시행인가', '관리처분인가', '이주철거', '착공', '준공',
+  ]
+
+  async function saveRedev() {
+    setSavingRedev(true)
+    try {
+      const r = await axios.patch(`/api/properties/${property.id}/manual`, {
+        redev_stage: stageInput,
+        redev_detail: detailInput,
+      })
+      setProperty(r.data)
+      setEditRedev(false)
+    } catch (e) {
+      alert('저장 실패: ' + e.message)
+    } finally {
+      setSavingRedev(false)
+    }
+  }
+
   async function saveFar() {
     const v = parseFloat(farInput)
     if (!v || v < 50 || v > 1500) {
@@ -115,8 +141,53 @@ export default function PropertyDetail({ property: initialProperty, onClose }) {
           </button>
         </div>
 
-        {/* 재건축 진행 단계 배지 */}
-        {property.redev_stage && (() => {
+        {/* 재건축 진행 단계 — 편집 모드 */}
+        {editRedev && (
+          <div className="border-b border-purple-100 bg-purple-50/50 px-6 py-3 space-y-2">
+            <p className="text-xs font-bold text-purple-700">재건축 단계 수동 입력</p>
+            <select
+              value={stageInput}
+              onChange={e => setStageInput(e.target.value)}
+              className="w-full rounded border border-purple-300 px-2 py-1.5 text-sm"
+            >
+              {REDEV_STAGES.map(s => (
+                <option key={s} value={s}>{s || '— 단계 없음 (삭제) —'}</option>
+              ))}
+            </select>
+            <input
+              type="text"
+              value={detailInput}
+              onChange={e => setDetailInput(e.target.value)}
+              placeholder="예: 2024.11 / 문래남성 (출처: 카페)"
+              className="w-full rounded border border-purple-300 px-2 py-1.5 text-xs"
+            />
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setEditRedev(false)}
+                className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1">취소</button>
+              <button onClick={saveRedev} disabled={savingRedev}
+                className="text-xs bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded px-3 py-1">
+                {savingRedev ? '저장 중...' : '저장'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 재건축 단계 없을 때 — 입력 CTA */}
+        {!editRedev && !property.redev_stage && (
+          <div className="border-b border-gray-100 bg-gray-50/40 px-6 py-2">
+            <button
+              onClick={() => { setStageInput(''); setDetailInput(''); setEditRedev(true) }}
+              className="text-xs text-gray-400 hover:text-purple-600 flex items-center gap-1"
+              title="재건축 단계를 알고 있으면 입력"
+            >
+              <span className="text-purple-400">⭐</span>
+              <span>재건축 단계 입력하기 ✎</span>
+            </button>
+          </div>
+        )}
+
+        {/* 재건축 진행 단계 배지 (단계 있을 때만) */}
+        {!editRedev && property.redev_stage && (() => {
           // detail 파싱: "사업시행인가 / 2024.11 / 신길우성2차 (서울시 공식)"
           const parts = (property.redev_detail || '').split(' / ').map(s => s.trim())
           let date = '', zone = '', source = ''
@@ -155,9 +226,20 @@ export default function PropertyDetail({ property: initialProperty, onClose }) {
                   )}
                   {source && <p className="text-[10px] text-gray-400 mt-0.5">출처: {source}</p>}
                 </div>
-                {property.redev_updated && (
-                  <p className="text-[10px] text-gray-400 shrink-0">업데이트 {property.redev_updated}</p>
-                )}
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  {property.redev_updated && (
+                    <p className="text-[10px] text-gray-400">업데이트 {property.redev_updated}</p>
+                  )}
+                  <button
+                    onClick={() => {
+                      setStageInput(property.redev_stage || '')
+                      setDetailInput(property.redev_detail || '')
+                      setEditRedev(true)
+                    }}
+                    className="text-[10px] text-gray-400 hover:text-purple-600"
+                    title="단계 수정"
+                  >✎ 수정</button>
+                </div>
               </div>
             </div>
           )

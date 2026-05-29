@@ -309,12 +309,9 @@ def patch_manual(property_id: int, payload: dict):
     from fastapi import HTTPException
     if not _use_db():
         raise HTTPException(status_code=503, detail="DB 미사용")
-    allowed = {
-        "far":   "far",
-        "units": "units",
-    }
     sets, vals = [], []
-    for k, col in allowed.items():
+    # 숫자 필드
+    for k, col in [("far", "far"), ("units", "units")]:
         if k in payload and payload[k] is not None:
             try:
                 v = float(payload[k]) if k == "far" else int(payload[k])
@@ -323,6 +320,17 @@ def patch_manual(property_id: int, payload: dict):
                 sets.append(f"{col}_manual=1")
             except Exception:
                 pass
+    # 재건축 단계 (문자열)
+    if "redev_stage" in payload:
+        stage = (payload.get("redev_stage") or "").strip()
+        sets.append("redev_stage=?"); vals.append(stage or None)
+        detail = (payload.get("redev_detail") or "").strip()
+        if detail:
+            sets.append("redev_detail=?"); vals.append(detail)
+        sets.append("redev_manual=1")
+        # 업데이트 일자도 자동 갱신
+        from datetime import datetime
+        sets.append("redev_updated=?"); vals.append(datetime.now().strftime("%Y-%m-%d"))
     if not sets:
         raise HTTPException(status_code=400, detail="입력값이 없습니다")
     conn = db_module.get_db()
