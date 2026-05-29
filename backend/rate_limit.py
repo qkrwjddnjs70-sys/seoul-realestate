@@ -17,6 +17,9 @@ LIMITS = {
     "filter":  10,    # 종합 AI 분석
 }
 
+# 기본 OFF. 켜려면 Render env: RATE_LIMIT_ENABLED=true
+_ENABLED = (os.getenv("RATE_LIMIT_ENABLED", "false").lower() == "true")
+
 KST = timezone(timedelta(hours=9))
 
 
@@ -52,7 +55,9 @@ def _client_ip(req: Request) -> str:
 
 
 def get_remaining(req: Request) -> dict:
-    """현재 남은 횟수 반환 (사용 안 함, 응답 헤더용)"""
+    """현재 남은 횟수 반환. 비활성 시 빈 dict"""
+    if not _ENABLED:
+        return {}
     ip = _client_ip(req)
     today = _today_kst()
     out = {}
@@ -69,7 +74,9 @@ def get_remaining(req: Request) -> dict:
 
 
 def check_and_increment(req: Request, feature: str):
-    """한도 체크 + 통과 시 증가. 초과 시 429 raise"""
+    """한도 체크 + 통과 시 증가. 초과 시 429 raise. 비활성 시 no-op"""
+    if not _ENABLED:
+        return
     if feature not in LIMITS:
         return
     # 관리자 우회 — ADMIN_BYPASS_TOKEN 헤더와 일치하면 카운트 안 함
