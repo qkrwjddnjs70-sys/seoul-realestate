@@ -307,6 +307,8 @@ COMPARE_SYSTEM = """당신은 시장 인사이더 수준의 부동산 깊이 분
 분석 원칙 (필수 준수):
 ■ **디테일 우선** — 단순 "재건축 추진" (X) → "○○구역, 시공사 ○○건설 우선협상자 선정, 2026.06 사업시행인가 신청 예정" (O)
 ■ **진행단계 명시** — 안전진단·정비계획·조합설립·시공사선정·사업시행인가·관리처분·이주·철거·착공 중 정확히 어느 단계
+  ※ 입력 데이터의 **★재건축단계** 필드가 최우선 근거다. 공식(정비사업 정보몽땅) 값이 있으면 그것을 단계로 단정 서술하라.
+    뉴스로 임의 추측하지 말 것. "정보 없음"으로 표시된 단지는 "공식 확인 안 됨"으로 서술. AI추정만 있으면 "(추정)"을 붙여라.
 ■ **교통**: 노선명·역명·시점 구체화 ("대장홍대선 2026.12 착공, 2031 개통 예정, ○○역 도보 N분")
 ■ **상업·인프라**: 구체 브랜드 — 스타필드, 신세계백화점, 현대백화점, IFC, 이마트, 코스트코, 트레이더스 등
 ■ **시세**: 50대·80대 분리 + 매매호가·전세호가 추세까지 ("80대 매매호가 18~22억 형성, 전세 9~11억")
@@ -432,11 +434,28 @@ def _meta(d: dict) -> str:
         ls = round(a["area_m2"] * 133.3 / a["far"], 1)
         land_str = f" | 대지지분 {ls}㎡ ({ls*0.3025:.1f}평, {a['area_m2']:.0f}㎡·용적률{a['far']}% 기준)"
     builder_str = f" | 시공사 {a['builder']}" if a.get("builder") else ""
+    # 재건축 단계 — DB 권위(정보몽땅/수동) 우선, AI추정은 참고로 별도 명시
+    redev_str = ""
+    off = a.get("redev_stage")
+    ai = a.get("redev_ai_stage")
+    if off:
+        redev_str = f"\n  ★재건축단계(정비사업 정보몽땅·공식): {off}"
+        if a.get("redev_detail"):
+            redev_str += f" [{a['redev_detail']}]"
+        if ai and ai != off:
+            redev_str += f"\n  (참고: AI추정은 '{ai}'로 공식과 다름 — 공식 기준으로 서술하되 최신 변동 가능성 언급)"
+    elif ai:
+        redev_str = f"\n  ★재건축단계(AI추정·미확인): {ai}"
+        if a.get("redev_ai_detail"):
+            redev_str += f" [{a['redev_ai_detail']}]"
+    else:
+        redev_str = "\n  ★재건축단계: 우리 DB에 진행 정보 없음 (뉴스로 추정 금지, '확인 안 됨'으로 서술)"
     return (f"단지명: {a.get('display_name') or a['name']} | 주소: {a['address']}\n"
             f"  실거래가 {a['last_price']/10000:.1f}억 ({a['area_m2']}㎡, {a.get('last_deal_date') or '-'}){pyeong}\n"
             f"  세대수 {a.get('units') or '-'} | 연식 {a.get('built_year') or '-'}년 | "
             f"용적률 {a.get('far') or '-'}%{land_str}{builder_str}\n"
-            f"  가까운역 {a.get('nearest_subway') or '-'} {a.get('subway_line') or ''} 도보 {a.get('walk_minutes') or '-'}분{bus_str}")
+            f"  가까운역 {a.get('nearest_subway') or '-'} {a.get('subway_line') or ''} 도보 {a.get('walk_minutes') or '-'}분{bus_str}"
+            f"{redev_str}")
 
 
 def _stats_text(d: dict) -> str:
