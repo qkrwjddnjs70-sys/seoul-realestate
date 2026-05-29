@@ -172,19 +172,22 @@ export default function PropertyDetail({ property: initialProperty, onClose }) {
           </div>
         )}
 
-        {/* 재건축 단계 없을 때 — 입력 CTA */}
-        {!editRedev && !property.redev_stage && (
-          <div className="border-b border-gray-100 bg-gray-50/40 px-6 py-2">
-            <button
-              onClick={() => { setStageInput(''); setDetailInput(''); setEditRedev(true) }}
-              className="text-xs text-gray-400 hover:text-purple-600 flex items-center gap-1"
-              title="재건축 단계를 알고 있으면 입력"
-            >
-              <span className="text-purple-400">⭐</span>
-              <span>재건축 단계 입력하기 ✎</span>
-            </button>
-          </div>
-        )}
+        {/* 재건축 단계 없을 때 — 입력 CTA (노후 단지는 강조) */}
+        {!editRedev && !property.redev_stage && (() => {
+          const old = (property.built_year || 9999) <= 2005   // 재건축 가능성 있는 노후 단지
+          return (
+            <div className={`border-b px-6 py-2 ${old ? 'border-purple-100 bg-purple-50/40' : 'border-gray-100 bg-gray-50/40'}`}>
+              <button
+                onClick={() => { setStageInput(''); setDetailInput(''); setEditRedev(true) }}
+                className={`text-xs flex items-center gap-1.5 ${old ? 'text-purple-700 font-medium hover:text-purple-900' : 'text-gray-400 hover:text-purple-600'}`}
+                title="재건축 단계를 알고 있으면 입력해 주세요"
+              >
+                <span className={old ? 'text-purple-500' : 'text-purple-400'}>⭐</span>
+                <span>{old ? '이 단지 재건축 진행 중인가요? 단계 입력하기' : '재건축 단계 입력'} ✎</span>
+              </button>
+            </div>
+          )
+        })()}
 
         {/* 재건축 진행 단계 배지 (단계 있을 때만) */}
         {!editRedev && property.redev_stage && (() => {
