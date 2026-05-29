@@ -8,7 +8,8 @@ import os, re, json, asyncio, difflib
 from typing import List
 import httpx
 from dotenv import dotenv_values
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
+from rate_limit import check_and_increment
 
 import database as db_module
 from routers.hojae import _naver_search, _interleave, KINDS, _anthropic
@@ -475,8 +476,10 @@ def _articles_text(items: list) -> str:
 
 @router.get("")
 async def compare(
+    request: Request,
     targets: List[str] = Query(..., description="비교 대상 2~3개"),
 ):
+    check_and_increment(request, "compare")
     if not _anthropic:
         return {"error": "ANTHROPIC_API_KEY 없음"}
     if len(targets) < 2:

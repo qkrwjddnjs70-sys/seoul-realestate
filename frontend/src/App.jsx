@@ -5,6 +5,7 @@ import PropertyDetail from './components/PropertyDetail'
 import CompareModal from './components/CompareModal'
 import AiFilterModal from './components/AiFilterModal'
 import WelcomeModal from './components/WelcomeModal'
+import UsageBadge from './components/UsageBadge'
 import CaptureButtons from './components/CaptureButtons'
 import MiniPriceChart from './components/MiniPriceChart'
 import { useProperties } from './hooks/useProperties'
@@ -19,6 +20,8 @@ export default function App() {
   const [compareOpen, setCompareOpen] = useState(false)
   const [hojaeOpen, setHojaeOpen] = useState(false)
   const [aiFilterOpen, setAiFilterOpen] = useState(false)
+  const [usageRefresh, setUsageRefresh] = useState(0)
+  const bumpUsage = useCallback(() => setUsageRefresh(k => k + 1), [])
 
   const { properties, total, loading } = useProperties(filters, mapBounds)
 
@@ -188,13 +191,17 @@ export default function App() {
         property={selectedProperty}
         open={hojaeOpen}
         onClose={() => setHojaeOpen(false)}
+        onAfterCall={bumpUsage}
       />
 
       {/* 환영 팝업 (첫 방문 시 1회) */}
       <WelcomeModal />
 
+      {/* 우상단 AI 사용량 배지 */}
+      <UsageBadge refreshKey={usageRefresh} />
+
       {/* 비교 분석 모달 */}
-      <CompareModal open={compareOpen} onClose={() => setCompareOpen(false)} />
+      <CompareModal open={compareOpen} onClose={() => setCompareOpen(false)} onAfterCall={bumpUsage} />
 
       {/* 종합 AI 분석 모달 */}
       <AiFilterModal
@@ -202,33 +209,40 @@ export default function App() {
         onClose={() => setAiFilterOpen(false)}
         onSelectProperty={setSelectedProperty}
         onLocateProperty={(p) => mapRef.current?.flyTo(p.lat, p.lng, 16)}
+        onAfterCall={bumpUsage}
       />
     </div>
   )
 }
 
 /* ─── 호재 검색 모달 ─── */
-function HojaeModal({ property, open, onClose }) {
+function HojaeModal({ property, open, onClose, onAfterCall }) {
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState(null)
   const [trend, setTrend] = useState(null)
+  const [rateError, setRateError] = useState(null)
   const captureRef = useRef(null)
 
   // property 바뀌면 데이터 리셋
-  useEffect(() => { setData(null); setTrend(null) }, [property?.id])
+  useEffect(() => { setData(null); setTrend(null); setRateError(null) }, [property?.id])
 
   // 모달 열릴 때 자동으로 검색 시작 + 시세 트렌드 fetch
   useEffect(() => {
     if (!open || !property) return
     let cancelled = false
-    setLoading(true); setData(null); setTrend(null)
+    setLoading(true); setData(null); setTrend(null); setRateError(null)
     ;(async () => {
       try {
         const dong = property.address?.match(/(\S+동|\S+가)/)?.[1] ?? ''
         const gu   = property.address?.match(/(\S+구)/)?.[1] ?? ''
         const res  = await fetch(`/api/hojae?dong=${encodeURIComponent(dong)}&gu=${encodeURIComponent(gu)}&name=${encodeURIComponent(property.name)}`)
+        if (res.status === 429) {
+          const err = await res.json()
+          if (!cancelled) setRateError(err.detail)
+          return
+        }
         const json = await res.json()
-        if (!cancelled) setData(json)
+        if (!cancelled) { setData(json); onAfterCall?.() }
       } catch {
         if (!cancelled) setData({ items: [], query: '' })
       } finally {
@@ -286,7 +300,20 @@ function HojaeModal({ property, open, onClose }) {
                 </div>
               )}
 
-              {!loading && data?.items?.length === 0 && (
+              {!loading && rateError && (
+                <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-4 text-center">
+                  <p className="text-2xl mb-2">⏰</p>
+                  <p className="text-sm font-bold text-amber-800">오늘 호재 검색 한도 초과</p>
+                  <p className="text-xs text-amber-700 mt-1">
+                    {rateError.used}/{rateError.limit}회 사용함
+                  </p>
+                  <p className="text-xs text-gray-500 mt-2">
+                    약 {rateError.reset_in_hours}시간 후 한국시간 자정에 리셋됩니다
+                  </p>
+                </div>
+              )}
+
+              {!loading && !rateError && data?.items?.length === 0 && (
                 <p className="text-center text-sm text-gray-400 py-8">관련 호재 글을 찾지 못했습니다</p>
               )}
 

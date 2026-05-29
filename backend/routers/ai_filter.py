@@ -5,7 +5,8 @@
 - 점수 계산 (가격, 도보, 세대수, 평지, 성장률, 인프라) → Top 30 반환
 """
 import os, json, sqlite3
-from fastapi import APIRouter, Body
+from fastapi import APIRouter, Body, Request
+from rate_limit import check_and_increment
 from dotenv import dotenv_values
 import anthropic
 
@@ -166,7 +167,8 @@ def _score(row: dict, c: dict) -> tuple[float, list[str]]:
 
 
 @router.post("")
-async def ai_filter(payload: dict = Body(...)):
+async def ai_filter(request: Request, payload: dict = Body(...)):
+    check_and_increment(request, "filter")
     query = (payload or {}).get("query", "").strip()
     if not query:
         return {"error": "조건을 입력해주세요"}

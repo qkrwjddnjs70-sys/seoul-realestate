@@ -14,7 +14,7 @@ const TIER_STYLE = {
   '하': 'bg-gray-50 border-gray-200 text-gray-500',
 }
 
-export default function CompareModal({ open, onClose }) {
+export default function CompareModal({ open, onClose, onAfterCall }) {
   const [targets, setTargets] = useState(['', '', ''])
   const [activeCount, setActiveCount] = useState(2)   // 2 or 3
   const [loading, setLoading] = useState(false)
@@ -54,9 +54,15 @@ export default function CompareModal({ open, onClose }) {
     try {
       const qs = list.map(t => `targets=${encodeURIComponent(t)}`).join('&')
       const res = await fetch(`/api/compare?${qs}`)
+      if (res.status === 429) {
+        const err = await res.json()
+        const d = err.detail
+        setError(`⏰ 오늘 비교 분석 한도 초과 (${d.used}/${d.limit}회). 약 ${d.reset_in_hours}시간 후 한국시간 자정 리셋`)
+        return
+      }
       const json = await res.json()
       if (json.error) setError(json.error)
-      else setData(json)
+      else { setData(json); onAfterCall?.() }
     } catch (e) {
       setError(String(e))
     } finally {

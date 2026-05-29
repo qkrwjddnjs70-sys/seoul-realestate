@@ -7,7 +7,8 @@ from email.utils import parsedate_to_datetime
 import httpx
 import anthropic
 from dotenv import dotenv_values
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
+from rate_limit import check_and_increment, get_remaining
 
 router = APIRouter()
 
@@ -291,10 +292,12 @@ KINDS = ("news", "blog", "cafearticle")
 
 @router.get("")
 async def search_hojae(
+    request: Request,
     dong: str = Query(""),
     gu:   str = Query(""),
     name: str = Query(""),
 ):
+    check_and_increment(request, "hojae")
     loc = dong or gu or name
     region = dong or gu
 

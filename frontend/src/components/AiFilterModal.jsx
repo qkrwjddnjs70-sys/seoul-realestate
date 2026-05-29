@@ -13,7 +13,7 @@ const EXAMPLES = [
   "10억 안쪽 신축 위주, 50㎡대, 강서구·양천구에서 골라줘",
 ]
 
-export default function AiFilterModal({ open, onClose, onSelectProperty, onLocateProperty }) {
+export default function AiFilterModal({ open, onClose, onSelectProperty, onLocateProperty, onAfterCall }) {
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState(null)
@@ -29,9 +29,15 @@ export default function AiFilterModal({ open, onClose, onSelectProperty, onLocat
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: query.trim() }),
       })
+      if (res.status === 429) {
+        const err = await res.json()
+        const d = err.detail
+        setError(`⏰ 오늘 AI 분석 한도 초과 (${d.used}/${d.limit}회). 약 ${d.reset_in_hours}시간 후 한국시간 자정 리셋`)
+        return
+      }
       const json = await res.json()
       if (json.error) setError(json.error)
-      else setData(json)
+      else { setData(json); onAfterCall?.() }
     } catch (e) {
       setError(String(e))
     } finally {

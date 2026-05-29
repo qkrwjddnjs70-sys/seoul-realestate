@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from routers import properties
 from routers import transactions
@@ -37,3 +37,10 @@ app.include_router(listings.router,  prefix="/api/listings",   tags=["listings"]
 @app.get("/")
 def root():
     return {"status": "ok", "service": "서울 부동산 API v2"}
+
+
+@app.get("/api/usage")
+def get_usage(request: Request):
+    """현재 IP의 오늘 AI 사용량 + 남은 횟수"""
+    from rate_limit import get_remaining
+    return get_remaining(request)
