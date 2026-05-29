@@ -91,14 +91,22 @@ const NaverMap = forwardRef(function NaverMap({ properties, selectedId, onMarker
     mapInstance.current = L.map(mapRef.current, {
       center: [37.5326, 127.0246],
       zoom: 12,
+      minZoom: 6,                // 한반도 전체 정도까지 줌아웃 허용
+      maxZoom: 19,
       zoomControl: true,
       preferCanvas: true,
+      // 모바일 핀치줌 명시
+      touchZoom: true,
+      tap: true,
+      tapTolerance: 15,
+      bounceAtZoomLimits: false,
     })
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; OpenStreetMap &copy; CARTO',
       subdomains: 'abcd',
       maxZoom: 19,
+      minZoom: 6,
     }).addTo(mapInstance.current)
 
     let boundsTimer = null
