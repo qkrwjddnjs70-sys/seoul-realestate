@@ -125,9 +125,11 @@ def _db_to_property(row: dict) -> dict:
         ),
         "lot_area":      row.get("lot_area") or 0,   # K-apt 단지 부지 (참고용)
         "builder":       row.get("builder") or "",
-        "redev_stage":   row.get("redev_stage") or "",
-        "redev_detail":  row.get("redev_detail") or "",
-        "redev_updated": row.get("redev_updated") or "",
+        "redev_stage":     row.get("redev_stage") or "",
+        "redev_detail":    row.get("redev_detail") or "",
+        "redev_updated":   row.get("redev_updated") or "",
+        "redev_ai_stage":  row.get("redev_ai_stage") or "",
+        "redev_ai_detail": row.get("redev_ai_detail") or "",
         "commute": {
             "gangnam":     row.get("time_gangnam", 0),
             "yeouido":     row.get("time_yeouido", 0),

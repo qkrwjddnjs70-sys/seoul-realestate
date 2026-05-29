@@ -19,15 +19,18 @@ function createMarkerIcon(p, isSelected) {
   const { bg, border } = priceColor(p.price)
   const outline = isSelected ? '#fff' : border
   const scale = isSelected ? 'scale(1.2)' : 'scale(1)'
-  // 준공된 단지는 진행 끝났으므로 별 제외
-  const inProgress = p.redev_stage && p.redev_stage !== '준공'
-  const star = inProgress
-    ? `<div title="재건축: ${p.redev_stage}" style="position:absolute;right:-10px;top:-14px;z-index:5;
+  // 재건축 별: 정보몽땅(보라) 우선, AI추정만(주황). 준공은 제외
+  const official = p.redev_stage && p.redev_stage !== '준공'
+  const aiOnly = !p.redev_stage && p.redev_ai_stage && p.redev_ai_stage !== '준공'
+  const starColor = official ? '#a855f7' : (aiOnly ? '#f59e0b' : null)
+  const starTitle = official ? `재건축: ${p.redev_stage}` : `재건축 추정(AI): ${p.redev_ai_stage}`
+  const star = starColor
+    ? `<div title="${starTitle}" style="position:absolute;right:-10px;top:-14px;z-index:5;
                   width:20px;height:20px;line-height:0;
                   filter:drop-shadow(0 1px 3px rgba(0,0,0,0.5));">
           <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
             <polygon points="12,2 15,9 22,9.5 17,14.5 18.5,22 12,18 5.5,22 7,14.5 2,9.5 9,9"
-                     fill="#a855f7" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>
+                     fill="${starColor}" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>
           </svg>
        </div>`
     : ''

@@ -172,15 +172,14 @@ export default function PropertyDetail({ property: initialProperty, onClose }) {
           </div>
         )}
 
-        {/* 재건축 단계 없을 때 — 입력 CTA (노후 단지는 강조) */}
-        {!editRedev && !property.redev_stage && (() => {
-          const old = (property.built_year || 9999) <= 2005   // 재건축 가능성 있는 노후 단지
+        {/* 재건축: 단계·AI추정 모두 없을 때 — 입력 CTA */}
+        {!editRedev && !property.redev_stage && !property.redev_ai_stage && (() => {
+          const old = (property.built_year || 9999) <= 2005
           return (
             <div className={`border-b px-6 py-2 ${old ? 'border-purple-100 bg-purple-50/40' : 'border-gray-100 bg-gray-50/40'}`}>
               <button
                 onClick={() => { setStageInput(''); setDetailInput(''); setEditRedev(true) }}
                 className={`text-xs flex items-center gap-1.5 ${old ? 'text-purple-700 font-medium hover:text-purple-900' : 'text-gray-400 hover:text-purple-600'}`}
-                title="재건축 단계를 알고 있으면 입력해 주세요"
               >
                 <span className={old ? 'text-purple-500' : 'text-purple-400'}>⭐</span>
                 <span>{old ? '이 단지 재건축 진행 중인가요? 단계 입력하기' : '재건축 단계 입력'} ✎</span>
@@ -189,58 +188,73 @@ export default function PropertyDetail({ property: initialProperty, onClose }) {
           )
         })()}
 
-        {/* 재건축 진행 단계 배지 (단계 있을 때만) */}
-        {!editRedev && property.redev_stage && (() => {
-          // detail 파싱: "사업시행인가 / 2024.11 / 신길우성2차 (서울시 공식)"
+        {/* 재건축 진행 단계 배지 */}
+        {!editRedev && (property.redev_stage || property.redev_ai_stage) && (() => {
+          const hasOfficial = !!property.redev_stage
+          // 정보몽땅/수동 detail 파싱
           const parts = (property.redev_detail || '').split(' / ').map(s => s.trim())
           let date = '', zone = '', source = ''
           for (const part of parts) {
-            if (/\(.*공식\)|\(.*\)$/.test(part)) {
-              source = part.replace(/[()]/g, '').trim()
-            } else if (/^\d{4}\.\d{1,2}/.test(part)) {
-              date = part
-            } else if (part !== property.redev_stage) {
-              zone = part.replace(/\s*\(.*\)\s*$/, '').trim()
-            }
+            if (/\(.*\)$/.test(part)) source = part.replace(/[()]/g, '').trim()
+            else if (/^\d{4}\.\d{1,2}/.test(part)) date = part
+            else if (part !== property.redev_stage) zone = part.replace(/\s*\(.*\)\s*$/, '').trim()
           }
-          // 단지명과 정비구역명이 다르면 통합 재건축 안내
-          const aptCore = (property.name || '').replace(/\d+차$/, '').trim()
-          const zoneCore = zone.replace(/\d+차$/, '').trim()
-          const isMerged = zone && aptCore && zoneCore && aptCore === zoneCore && zone !== property.name
+          const aiStage = property.redev_ai_stage
+          const aiDetail = property.redev_ai_detail || ''
+          // 충돌: 정보몽땅 있고 AI 있고 단계가 다름
+          const conflict = hasOfficial && aiStage && aiStage !== property.redev_stage
+          const aiOnly = !hasOfficial && aiStage
+
           return (
-            <div className="border-b border-purple-100 bg-gradient-to-r from-purple-50 to-fuchsia-50 px-6 py-3">
+            <div className={`border-b px-6 py-3 ${
+              aiOnly ? 'border-amber-100 bg-amber-50/50'
+                     : 'border-purple-100 bg-gradient-to-r from-purple-50 to-fuchsia-50'}`}>
               <div className="flex items-start gap-2">
-                <svg viewBox="0 0 24 24" width="22" height="22" xmlns="http://www.w3.org/2000/svg"
-                     className="shrink-0 mt-0.5"
+                <svg viewBox="0 0 24 24" width="22" height="22" className="shrink-0 mt-0.5"
                      style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.2))' }}>
                   <polygon points="12,2 15,9 22,9.5 17,14.5 18.5,22 12,18 5.5,22 7,14.5 2,9.5 9,9"
-                           fill="#a855f7" stroke="#fff" strokeWidth="1.5" strokeLinejoin="round" />
+                           fill={aiOnly ? '#f59e0b' : '#a855f7'} stroke="#fff" strokeWidth="1.5" strokeLinejoin="round" />
                 </svg>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-purple-700">재건축 진행</p>
-                  <p className="text-sm font-semibold text-gray-900">
-                    {property.redev_stage}{date && <span className="text-xs text-gray-500 font-normal ml-1.5">({date})</span>}
-                  </p>
-                  {zone && (
-                    <p className="text-xs text-gray-600 mt-0.5">
-                      <span className="text-gray-400">정비구역:</span> <b>{zone}</b>
-                      {isMerged && <span className="ml-1.5 inline-block rounded bg-purple-100 text-purple-700 text-[10px] font-semibold px-1.5 py-0.5">통합 재건축</span>}
-                    </p>
+                  {hasOfficial ? (
+                    <>
+                      <p className="text-xs font-bold text-purple-700">재건축 진행 <span className="text-[10px] font-normal text-purple-400">· 정비사업 정보몽땅</span></p>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {property.redev_stage}
+                        {date && <span className="text-xs text-gray-500 font-normal ml-1.5">({date})</span>}
+                      </p>
+                      {zone && <p className="text-xs text-gray-600 mt-0.5"><span className="text-gray-400">사업장:</span> {zone}</p>}
+                      {/* 충돌 경고 */}
+                      {conflict && (
+                        <div className="mt-1.5 rounded-md bg-amber-50 border border-amber-200 px-2 py-1.5">
+                          <p className="text-[11px] font-bold text-amber-700">⚠ 확인 필요 — AI 추정과 다름</p>
+                          <p className="text-[11px] text-amber-800 mt-0.5">
+                            AI 추정: <b>{aiStage}</b>
+                          </p>
+                          {aiDetail && <p className="text-[10px] text-amber-600 mt-0.5">{aiDetail}</p>}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xs font-bold text-amber-700">재건축 추정 <span className="text-[10px] font-normal text-amber-500">· AI 추정 · 미확인</span></p>
+                      <p className="text-sm font-semibold text-gray-900">{aiStage}</p>
+                      {aiDetail && <p className="text-[11px] text-gray-600 mt-0.5">{aiDetail}</p>}
+                      <p className="text-[10px] text-amber-600 mt-1">⚠ 공식 확인 안 됨 — 정확한 단계를 알면 수정해 주세요</p>
+                    </>
                   )}
-                  {source && <p className="text-[10px] text-gray-400 mt-0.5">출처: {source}</p>}
                 </div>
                 <div className="flex flex-col items-end gap-1 shrink-0">
-                  {property.redev_updated && (
-                    <p className="text-[10px] text-gray-400">업데이트 {property.redev_updated}</p>
+                  {property.redev_updated && hasOfficial && (
+                    <p className="text-[10px] text-gray-400">{property.redev_updated}</p>
                   )}
                   <button
                     onClick={() => {
-                      setStageInput(property.redev_stage || '')
-                      setDetailInput(property.redev_detail || '')
+                      setStageInput(property.redev_stage || aiStage || '')
+                      setDetailInput(hasOfficial ? (property.redev_detail || '') : '')
                       setEditRedev(true)
                     }}
                     className="text-[10px] text-gray-400 hover:text-purple-600"
-                    title="단계 수정"
                   >✎ 수정</button>
                 </div>
               </div>
