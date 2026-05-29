@@ -43,3 +43,6 @@ Thumbs.db
 # Claude
 .claude/
 backend/apartments.db
+
+backend/data/rate_limit.db
+backend/data/seoul_redev_cache.json
