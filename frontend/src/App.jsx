@@ -4,6 +4,7 @@ import NaverMap from './components/NaverMap'
 import PropertyDetail from './components/PropertyDetail'
 import CompareModal from './components/CompareModal'
 import AiFilterModal from './components/AiFilterModal'
+import WelcomeModal from './components/WelcomeModal'
 import CaptureButtons from './components/CaptureButtons'
 import MiniPriceChart from './components/MiniPriceChart'
 import { useProperties } from './hooks/useProperties'
@@ -188,6 +189,9 @@ export default function App() {
         open={hojaeOpen}
         onClose={() => setHojaeOpen(false)}
       />
+
+      {/* 환영 팝업 (첫 방문 시 1회) */}
+      <WelcomeModal />
 
       {/* 비교 분석 모달 */}
       <CompareModal open={compareOpen} onClose={() => setCompareOpen(false)} />
