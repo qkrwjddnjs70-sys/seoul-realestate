@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import axios from 'axios'
 import PriceChart from './PriceChart'
+import CostCalculatorModal from './CostCalculatorModal'
 
 function fmt(manwon) {
   if (!manwon) return '-'
@@ -33,6 +34,7 @@ export default function PropertyDetail({ property: initialProperty, onClose }) {
   const [farInput, setFarInput] = useState('')
   const [savingFar, setSavingFar] = useState(false)
 
+  const [costOpen, setCostOpen] = useState(false)
   const [editRedev, setEditRedev] = useState(false)
   const [stageInput, setStageInput] = useState('')
   const [detailInput, setDetailInput] = useState('')
@@ -134,6 +136,13 @@ export default function PropertyDetail({ property: initialProperty, onClose }) {
               >
                 🗺️ 네이버 지도
               </a>
+              <button
+                onClick={() => setCostOpen(true)}
+                className="inline-flex items-center gap-1 rounded-md bg-blue-600 hover:bg-blue-700 px-2.5 py-1 text-xs font-semibold text-white shadow-sm transition-colors"
+                title="대출·세금·총비용 계산"
+              >
+                💰 내 비용 계산하기
+              </button>
             </div>
           </div>
           <button onClick={onClose} className="ml-4 rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 shrink-0">
@@ -402,6 +411,9 @@ export default function PropertyDetail({ property: initialProperty, onClose }) {
           )}
         </div>
       </div>
+
+      {/* 비용 계산기 */}
+      <CostCalculatorModal open={costOpen} onClose={() => setCostOpen(false)} property={property} />
     </div>
   )
 }
