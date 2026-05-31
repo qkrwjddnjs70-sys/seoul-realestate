@@ -292,6 +292,20 @@ function HojaeModal({ property, open, onClose, onAfterCall }) {
                 </div>
               )}
 
+              {/* 미래 교통호재 (GTX 등) */}
+              {property?.future_transit?.length > 0 && (
+                <div className="rounded-xl border border-sky-200 bg-sky-50/60 p-3">
+                  <p className="text-xs font-bold text-sky-700 mb-1.5">🚄 미래 교통호재 (예정·착공 노선)</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {property.future_transit.map((t, k) => (
+                      <span key={k} className="text-[11px] rounded-full bg-white border border-sky-200 text-sky-700 px-2 py-0.5">
+                        <b>{t.line}</b> {t.station}역 도보 {t.walk_min}분 <span className="text-sky-400">· {t.status}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {loading && (
                 <div className="flex flex-col items-center py-10 text-gray-400">
                   <div className="animate-spin text-3xl mb-2">🔍</div>

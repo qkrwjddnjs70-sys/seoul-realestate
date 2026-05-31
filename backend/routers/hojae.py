@@ -232,7 +232,7 @@ def _interleave(lists: list[list], limit: int, seen: set) -> list:
     return out
 
 
-async def _summarize(loc: str, items: list[dict]) -> dict | None:
+async def _summarize(loc: str, items: list[dict], extra: str = "") -> dict | None:
     """수집한 글들을 Claude Haiku로 요약"""
     if not _anthropic or not items:
         return None
@@ -245,7 +245,8 @@ async def _summarize(loc: str, items: list[dict]) -> dict | None:
 
     user_msg = (
         f"다음은 '{loc}' 지역 부동산 관련 글 {len(items)}개입니다. "
-        f"이 지역의 호재를 분석해 정리해 주세요.\n\n{articles_text}"
+        f"이 지역의 호재를 분석해 정리해 주세요.\n"
+        f"{extra}\n\n{articles_text}"
     )
 
     try:
@@ -364,7 +365,44 @@ async def search_hojae(
         theme_lists = [flat[ki * nq + j] for j in range(nq)]
         items.extend(_interleave(theme_lists, 30, seen))
 
-    # Haiku 요약
-    summary = await _summarize(loc, items)
+    # 단지의 미래 교통호재(GTX 등) DB 조회 → 요약에 주입
+    extra = _future_transit_hint(name, dong)
 
-    return {"query": " / ".join(queries), "summary": summary, "items": items}
+    # Haiku 요약
+    summary = await _summarize(loc, items, extra)
+
+    return {"query": " / ".join(queries), "summary": summary, "items": items,
+            "future_transit_note": extra.strip()}
+
+
+def _future_transit_hint(name: str, dong: str) -> str:
+    """단지명/동으로 DB future_transit 조회 → 요약 프롬프트용 힌트"""
+    try:
+        import database as _db, json as _j
+        if not _db.db_exists():
+            return ""
+        conn = _db.get_db()
+        row = None
+        if name:
+            nm = name.replace(" ", "")
+            row = conn.execute(
+                "SELECT future_transit FROM apartments WHERE REPLACE(COALESCE(display_name,name),' ','') LIKE ? "
+                "AND future_transit IS NOT NULL LIMIT 1", (f"%{nm}%",)
+            ).fetchone()
+        if not row and dong:
+            row = conn.execute(
+                "SELECT future_transit FROM apartments WHERE dong LIKE ? AND future_transit IS NOT NULL "
+                "ORDER BY last_price DESC LIMIT 1", (f"%{dong}%",)
+            ).fetchone()
+        conn.close()
+        if not row or not row["future_transit"]:
+            return ""
+        ft = _j.loads(row["future_transit"])
+        if not ft:
+            return ""
+        items = [f"{h['line']} {h['station']}역 도보{h['walk_min']}분({h['status']})" for h in ft]
+        return ("\n[중요 — 미래 교통호재 (공식 노선계획 기반, 반드시 분석에 포함)]\n"
+                "이 단지/지역 인근 예정·착공 노선: " + ", ".join(items) +
+                "\nGTX·신안산선 등은 광역 접근성을 바꾸는 핵심 호재이므로 '교통 호재' 카테고리에 우선 반영하라.")
+    except Exception:
+        return ""
