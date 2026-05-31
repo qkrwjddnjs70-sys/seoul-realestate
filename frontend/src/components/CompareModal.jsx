@@ -234,6 +234,39 @@ export default function CompareModal({ open, onClose, onAfterCall }) {
                         </div>
                       </div>
                     )}
+
+                    {/* 지역 개발성 (정비사업 정보몽땅) */}
+                    {(side.nearby_redev?.length > 0 || side.dong_projects?.length > 0) && (
+                      <div className="mt-2 pt-2 border-t border-purple-100 text-xs">
+                        <p className="font-semibold text-purple-700 mb-1">🏗 지역 개발성</p>
+                        {side.nearby_redev?.length > 0 && (
+                          <div className="mb-1">
+                            <p className="text-gray-500">반경 700m 재건축 <b className="text-purple-700">{side.nearby_redev.length}개</b></p>
+                            <div className="mt-0.5 space-y-0.5">
+                              {side.nearby_redev.slice(0, 5).map((n, k) => (
+                                <p key={k} className="text-gray-600">
+                                  · {n.name} <span className="text-gray-400">{n.dist_m}m</span>
+                                  <span className={`ml-1 ${n.official ? 'text-purple-600' : 'text-amber-600'}`}>{n.stage}</span>
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {side.dong_projects?.length > 0 && (
+                          <div className="mt-1">
+                            <p className="text-gray-500">{side.apt?.dong} 정비사업 <b className="text-purple-700">{side.dong_projects.length}건</b></p>
+                            <div className="mt-0.5 space-y-0.5">
+                              {side.dong_projects.slice(0, 6).map((p, k) => (
+                                <p key={k} className="text-gray-600">
+                                  · <span className="text-gray-400">[{p.type}]</span> {p.name}
+                                  <span className="text-purple-600 ml-1">{p.stage}</span>
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

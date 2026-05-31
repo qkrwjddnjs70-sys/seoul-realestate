@@ -22,6 +22,30 @@ def _normalize_apt_query(q: str) -> str:
 
 router = APIRouter()
 
+# 정비사업 정보몽땅 캐시 로드 (gu+동(가 통합) → 사업장 목록)
+import math
+def _base_dong(d: str) -> str:
+    """'양평동2가'→'양평동', '문래동3가'→'문래동' (일대 통합)"""
+    if not d: return ""
+    m = re.match(r"([가-힣]+동)", d)
+    return m.group(1) if m else d
+_CLEANUP_BY_DONG = {}
+try:
+    _cj = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "cleanup_projects.json")
+    with open(_cj, encoding="utf-8") as f:
+        for p in json.load(f):
+            _CLEANUP_BY_DONG.setdefault((p["gu"], _base_dong(p["dong"])), []).append(p)
+except Exception:
+    pass
+
+_DEAD_STAGES = {"조합해산", "조합청산", "청산 및 조합해산", "이전고시"}
+
+def _haversine(la1, ln1, la2, ln2):
+    R = 6371
+    dlat = math.radians(la2 - la1); dlng = math.radians(ln2 - ln1)
+    a = math.sin(dlat/2)**2 + math.cos(math.radians(la1))*math.cos(math.radians(la2))*math.sin(dlng/2)**2
+    return R * 2 * math.asin(math.sqrt(a))
+
 # 카카오 키
 _ENV = dotenv_values(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
 KAKAO_KEY = os.getenv("KAKAO_REST_KEY") or _ENV.get("KAKAO_REST_KEY") or ""
@@ -282,6 +306,9 @@ async def _collect_for(target: str) -> dict:
     infra = dict(zip(INFRA_CODES.keys(), infra_counts)) if infra_counts else {}
     region_stats = _region_stats(target)
 
+    # ─ 지역 개발성: 반경 700m 재건축 밀집 + 동 정비사업 목록 ─
+    nearby_redev, dong_projects = _development_context(apt)
+
     return {
         "label":        label,
         "apt":          apt,
@@ -289,9 +316,63 @@ async def _collect_for(target: str) -> dict:
         "infra":        infra,
         "region":       region,
         "region_stats": region_stats,
+        "nearby_redev": nearby_redev,
+        "dong_projects": dong_projects,
         "match_type":   (apt or {}).get("_match_type"),
         "match_score":  (apt or {}).get("_match_score"),
     }
+
+
+def _development_context(apt: dict | None):
+    """단지 주변 개발성 데이터 — 반경 700m 재건축 진행단지 + 동 정비사업"""
+    nearby = []
+    dong_projects = []
+    if not apt:
+        return nearby, dong_projects
+    # 반경 700m 내 재건축/추정 진행 단지 (DB)
+    if apt.get("lat") and apt.get("lng"):
+        try:
+            conn = db_module.get_db()
+            rows = conn.execute(
+                "SELECT display_name, name, lat, lng, redev_stage, redev_ai_stage, built_year "
+                "FROM apartments WHERE lawd_cd=? AND geocoded=1 "
+                "AND (redev_stage IS NOT NULL AND redev_stage!='' "
+                "  OR redev_ai_stage IS NOT NULL AND redev_ai_stage!='')",
+                (apt.get("lawd_cd"),)
+            ).fetchall()
+            conn.close()
+            for r in rows:
+                if not r["lat"] or not r["lng"]:
+                    continue
+                d = _haversine(apt["lat"], apt["lng"], r["lat"], r["lng"])
+                if 0 < d <= 0.7:
+                    stage = r["redev_stage"] or r["redev_ai_stage"]
+                    official = bool(r["redev_stage"])
+                    nearby.append({
+                        "name": r["display_name"] or r["name"],
+                        "dist_m": int(d * 1000),
+                        "stage": stage,
+                        "official": official,
+                    })
+            nearby.sort(key=lambda x: x["dist_m"])
+            nearby = nearby[:10]
+        except Exception:
+            pass
+    # 동 정비사업 (정보몽땅) — 주소에서 동 파싱(dong 컬럼 오류 대비), 가 통합
+    gu_name = next((g for g, code in GU_BY_NAME.items() if code == apt.get("lawd_cd") and g.endswith("구")), None)
+    addr = apt.get("address") or ""
+    m = re.search(r"([가-힣]+동)(?!구)(?:\d+가)?", addr)
+    base_dong = m.group(1) if m else _base_dong(apt.get("dong") or "")
+    if gu_name and base_dong:
+        seen_names = set()
+        for p in _CLEANUP_BY_DONG.get((gu_name, base_dong), []):
+            if p["stage"] in _DEAD_STAGES:
+                continue
+            if p["name"] in seen_names:    # 중복 사업장 제거
+                continue
+            seen_names.add(p["name"])
+            dong_projects.append({"name": p["name"][:30], "type": p["type"][:10], "stage": p["stage"]})
+    return nearby, dong_projects
 
 
 COMPARE_SYSTEM = """당신은 시장 인사이더 수준의 부동산 깊이 분석가입니다.
@@ -317,7 +398,7 @@ COMPARE_SYSTEM = """당신은 시장 인사이더 수준의 부동산 깊이 분
 ■ **일반론·교과서적 설명 금지** — "교통이 편리하다" (X) → "9호선 등촌역 도보 5분 + 5호선 우장산 도보 12분 더블역세권" (O)
 
 출력 형식:
-- categories[8~12개]: 재건축 진행단계, 교통 인프라, 상업·인프라 호재, 학군·교육, 시세 및 가격경쟁력, 거주 분위기, 미래가치 등
+- categories[8~12개]: 재건축 진행단계, **지역 개발성·상승여력**, 교통 인프라, 상업·인프라 호재, 학군·교육, 시세 및 가격경쟁력, 거주 분위기, 미래가치 등
   evaluations[i].summary는 구체 사실 + 시점 + 단계 + 고유명사 포함, 100자 이상 권장
   tier는 "상"/"중"/"하" — 그 항목에서 i번째 대상의 상대적 우위
 
@@ -486,6 +567,27 @@ def _infra_text(d: dict) -> str:
     return "[반경 1km 인프라] " + " | ".join(f"{k} {v}개" for k, v in inf.items())
 
 
+def _dev_text(d: dict) -> str:
+    """지역 개발성 — 반경 700m 재건축 밀집 + 동 정비사업 (정보몽땅 공식)"""
+    nearby = d.get("nearby_redev") or []
+    projects = d.get("dong_projects") or []
+    lines = ["[지역 개발성 — 정비사업 정보몽땅 공식]"]
+    if nearby:
+        items = [f"{n['name']}({n['dist_m']}m·{n['stage']}{'·공식' if n['official'] else '·추정'})" for n in nearby[:8]]
+        lines.append(f"  ▸ 반경700m 재건축 진행단지 {len(nearby)}개: " + ", ".join(items))
+    else:
+        lines.append("  ▸ 반경700m 재건축 진행단지: 없음")
+    if projects:
+        from collections import Counter
+        types = Counter(p["type"] for p in projects)
+        type_str = ", ".join(f"{t} {ct}건" for t, ct in types.items())
+        items = [f"{p['name']}({p['type']}·{p['stage']})" for p in projects[:10]]
+        lines.append(f"  ▸ 해당 동 정비사업 {len(projects)}건 [{type_str}]: " + "; ".join(items))
+    else:
+        lines.append("  ▸ 해당 동 정비사업: 없음")
+    return "\n".join(lines)
+
+
 def _articles_text(items: list) -> str:
     lines = []
     for i, it in enumerate(items, 1):
@@ -517,7 +619,8 @@ async def compare(
             f"\n# 대상 {label_letter}: {d['label']}\n"
             f"{_meta(d)}\n"
             f"{_stats_text(d)}\n"
-            f"{_infra_text(d)}\n\n"
+            f"{_infra_text(d)}\n"
+            f"{_dev_text(d)}\n\n"
             f"## {label_letter} 관련 글 ({len(d['items'])}개)\n"
             f"{_articles_text(d['items'])}"
         )
@@ -557,13 +660,15 @@ async def compare(
     return {
         "targets": [
             {
-                "label":        d["label"],
-                "apt":          d["apt"],
-                "items_count":  len(d["items"]),
-                "region_stats": d["region_stats"],
-                "infra":        d["infra"],
-                "match_type":   d["match_type"],
-                "match_score":  d["match_score"],
+                "label":         d["label"],
+                "apt":           d["apt"],
+                "items_count":   len(d["items"]),
+                "region_stats":  d["region_stats"],
+                "infra":         d["infra"],
+                "nearby_redev":  d.get("nearby_redev", []),
+                "dong_projects": d.get("dong_projects", []),
+                "match_type":    d["match_type"],
+                "match_score":   d["match_score"],
             }
             for d in data_list
         ],
