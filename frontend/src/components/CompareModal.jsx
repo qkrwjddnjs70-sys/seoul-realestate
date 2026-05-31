@@ -15,8 +15,8 @@ const TIER_STYLE = {
 }
 
 export default function CompareModal({ open, onClose, onAfterCall }) {
-  const [targets, setTargets] = useState(['', '', ''])
-  const [activeCount, setActiveCount] = useState(2)   // 2 or 3
+  const [targets, setTargets] = useState(['', '', '', '', '', ''])
+  const [activeCount, setActiveCount] = useState(2)   // 2 ~ 6
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
@@ -71,13 +71,15 @@ export default function CompareModal({ open, onClose, onAfterCall }) {
   }
 
   function reset() {
-    setTargets(['', '', '']); setActiveCount(2); setData(null); setError(null)
+    setTargets(['', '', '', '', '', '']); setActiveCount(2); setData(null); setError(null)
   }
 
   if (!open) return null
 
   const n = data?.targets?.length ?? activeCount
-  const gridCols = n === 3 ? 'grid-cols-3' : 'grid-cols-2'
+  // 2~6개: 2~3개는 그 수만큼, 4개↑는 가독성 위해 3열
+  const gridCols = n <= 2 ? 'grid-cols-2' : 'grid-cols-3'
+  const inputCols = activeCount <= 2 ? 'grid-cols-2' : 'grid-cols-3'
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>

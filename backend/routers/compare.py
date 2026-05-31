@@ -1,5 +1,5 @@
 """
-최대 3개 단지·지역 비교 분석 — Claude Sonnet 4.6
+최대 6개 단지·지역 비교 분석 — Claude Sonnet 4.6
 - 호재 글 (뉴스/블로그/카페 각 30개)
 - DB 시세 통계 (해당 동의 평균/중앙값)
 - Kakao 인프라 카운트 (1km 반경 학교/병원/마트/지하철 등)
@@ -664,31 +664,34 @@ def _articles_text(items: list) -> str:
 @router.get("")
 async def compare(
     request: Request,
-    targets: List[str] = Query(..., description="비교 대상 2~3개"),
+    targets: List[str] = Query(..., description="비교 대상 2~6개"),
 ):
     check_and_increment(request, "compare")
     if not _anthropic:
         return {"error": "ANTHROPIC_API_KEY 없음"}
     if len(targets) < 2:
         return {"error": "비교 대상 2개 이상 필요"}
-    if len(targets) > 3:
-        targets = targets[:3]
+    if len(targets) > 6:
+        targets = targets[:6]
 
     # 모든 대상 데이터 병렬 수집
     data_list = await asyncio.gather(*[_collect_for(t) for t in targets])
 
-    # 프롬프트 구성
+    # 프롬프트 구성 — 대상이 많을수록 단지당 기사 수를 줄여 토큰 폭발 방지
+    n = len(data_list)
+    per_arts = 30 if n <= 3 else (18 if n == 4 else (14 if n == 5 else 10))
     sections = []
     for idx, d in enumerate(data_list):
         label_letter = chr(ord("A") + idx)
+        arts = d["items"][:per_arts]
         sections.append(
             f"\n# 대상 {label_letter}: {d['label']}\n"
             f"{_meta(d)}\n"
             f"{_stats_text(d)}\n"
             f"{_infra_text(d)}\n"
             f"{_dev_text(d)}\n\n"
-            f"## {label_letter} 관련 글 ({len(d['items'])}개)\n"
-            f"{_articles_text(d['items'])}"
+            f"## {label_letter} 관련 글 ({len(arts)}개)\n"
+            f"{_articles_text(arts)}"
         )
     user_msg = (
         "\n---\n".join(sections)
@@ -699,7 +702,7 @@ async def compare(
     try:
         resp = await _anthropic.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=12000,           # 8192 → 12000 (강화된 기준으로 응답 더 길어짐)
+            max_tokens=16000,           # 6개 비교까지 대응 (대상 많을수록 응답 길어짐)
             system=[{"type": "text", "text": COMPARE_SYSTEM,
                      "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content": user_msg}],
