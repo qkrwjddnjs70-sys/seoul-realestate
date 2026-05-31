@@ -165,15 +165,19 @@ const NaverMap = forwardRef(function NaverMap({ properties, selectedId, onMarker
 
     const group = L.layerGroup()
     SUBWAY_LINES.forEach(line => {
+      const isDashed = line.dashed   // 착공·예정 노선
       L.polyline(line.stations.map(([lat, lng]) => [lat, lng]), {
-        color: line.color, weight: 3, opacity: 0.75,
+        color: line.color,
+        weight: isDashed ? 4 : 3,
+        opacity: isDashed ? 0.9 : 0.75,
+        dashArray: isDashed ? '10, 8' : null,
       }).addTo(group)
 
       line.stations.forEach(([lat, lng, name]) => {
         const circle = L.circleMarker([lat, lng], {
           radius: 4,
           color: line.color,
-          fillColor: '#fff',
+          fillColor: isDashed ? line.color : '#fff',
           fillOpacity: 1,
           weight: 2,
         })
@@ -262,7 +266,12 @@ const NaverMap = forwardRef(function NaverMap({ properties, selectedId, onMarker
         <div className="absolute top-24 right-3 z-[1000] rounded-xl border border-gray-200 bg-white/95 px-3 py-2 text-xs shadow backdrop-blur-sm">
           {SUBWAY_LINES.map(line => (
             <div key={line.id} className="flex items-center gap-1.5 mb-0.5 last:mb-0">
-              <span style={{ background: line.color }} className="inline-block h-2 w-4 rounded-full" />
+              {line.dashed ? (
+                <span className="inline-block h-2 w-4 rounded-full"
+                      style={{ background: `repeating-linear-gradient(90deg, ${line.color} 0 3px, transparent 3px 5px)` }} />
+              ) : (
+                <span style={{ background: line.color }} className="inline-block h-2 w-4 rounded-full" />
+              )}
               <span className="text-gray-700">{line.name}</span>
             </div>
           ))}
