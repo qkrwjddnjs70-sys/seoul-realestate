@@ -368,6 +368,21 @@ export default function PropertyDetail({ property: initialProperty, onClose }) {
           <Stat label="버스" value={property.bus_routes.slice(0, 2).join(', ')} />
         </div>
 
+        {/* 미래 교통호재 (GTX 등 예정/착공 노선) */}
+        {property.future_transit?.length > 0 && (
+          <div className="border-b border-sky-100 bg-sky-50/50 px-6 py-3">
+            <p className="text-xs font-bold text-sky-700 mb-1.5">🚄 미래 교통호재</p>
+            <div className="flex flex-wrap gap-1.5">
+              {property.future_transit.map((t, k) => (
+                <span key={k} className="text-[11px] rounded-full bg-white border border-sky-200 text-sky-700 px-2 py-0.5">
+                  <b>{t.line}</b> {t.station}역 도보 {t.walk_min}분
+                  <span className="text-sky-400 ml-1">· {t.status}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* 지역 개발성 (반경 700m 재건축 + 동 정비사업) */}
         {dev && (dev.nearby_redev?.length > 0 || dev.dong_projects?.length > 0) && (
           <div className="border-b border-purple-100 bg-purple-50/30 px-6 py-3">

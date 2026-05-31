@@ -92,6 +92,16 @@ def _mock_to_property(p: dict) -> dict:
     }
 
 
+def _parse_future_transit(val):
+    if not val:
+        return []
+    try:
+        import json as _j
+        return _j.loads(val)
+    except Exception:
+        return []
+
+
 def _db_to_property(row: dict) -> dict:
     return {
         "id":             row["id"],
@@ -130,6 +140,7 @@ def _db_to_property(row: dict) -> dict:
         "redev_updated":   row.get("redev_updated") or "",
         "redev_ai_stage":  row.get("redev_ai_stage") or "",
         "redev_ai_detail": row.get("redev_ai_detail") or "",
+        "future_transit":  _parse_future_transit(row.get("future_transit")),
         "commute": {
             "gangnam":     row.get("time_gangnam", 0),
             "yeouido":     row.get("time_yeouido", 0),

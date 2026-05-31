@@ -445,7 +445,9 @@ COMPARE_SYSTEM = """당신은 시장 인사이더 수준의 부동산 깊이 분
     2) 환승 가능 노선 수 (더블·트리플 역세권 우대)
     3) 버스 노선의 직결 목적지 다양성 — 한 번 환승 없이 갈 수 있는 핵심지(강남·여의도·광화문·홍대·용산) 개수
     4) 신규 노선·GTX 등 미래 교통 호재
-    역 개수만 많아도 멀거나 잡 노선뿐이면 "중/하". 도보 3분 이내 + 다중 환승 + 강남·홍대 직통 버스면 "상".
+    5) **★미래교통호재** 필드(GTX-B·GTX-C·신안산선·동북선 등 예정/착공 노선) — 도보권이면 강력 가산. 특히 GTX는 광역접근성 게임체인저.
+    역 개수만 많아도 멀거나 잡 노선뿐이면 "중/하". 도보 3분 이내 + 다중 환승 + GTX/신안산선 도보권 + 강남·홍대 직통 버스면 "상".
+    summary에 미래교통호재가 있으면 반드시 명시 (예: "GTX-B 신도림역 도보5분 착공 → 여의도·서울역·청량리 급행 직결").
   • **재건축 가치**: 다음 3가지 종합 평가
     1) 대지지분 (㎡): 높을수록 환급 평수 큼 — 25㎡ 이상 ★★★ / 18~25㎡ ★★ / 12~18㎡ ★ / 12㎡ 미만 ✗
     2) 용적률: 낮을수록 재건축 사업성 큼 — 180% 이하 ★★★ / 200% 이하 ★★ / 250% 이하 ★ / 그 외 ✗
@@ -573,7 +575,34 @@ def _meta(d: dict) -> str:
             f"  세대수 {a.get('units') or '-'} | 연식 {a.get('built_year') or '-'}년 | "
             f"용적률 {a.get('far') or '-'}%{land_str}{builder_str}\n"
             f"  가까운역 {a.get('nearest_subway') or '-'} {a.get('subway_line') or ''} 도보 {a.get('walk_minutes') or '-'}분{bus_str}"
-            f"{redev_str}")
+            f"{redev_str}"
+            f"{_future_transit_str(a)}")
+
+
+def _future_transit_list(a):
+    if not a:
+        return []
+    ft = a.get("future_transit")
+    if isinstance(ft, str):
+        try:
+            ft = json.loads(ft)
+        except Exception:
+            ft = []
+    return ft or []
+
+
+def _future_transit_str(a: dict) -> str:
+    """미래 교통호재 (GTX-B 등 예정/착공 노선)"""
+    ft = a.get("future_transit")
+    if isinstance(ft, str):
+        try:
+            ft = json.loads(ft)
+        except Exception:
+            ft = []
+    if not ft:
+        return ""
+    items = [f"{h['line']} {h['station']}역 도보{h['walk_min']}분({h['status']})" for h in ft]
+    return "\n  ★미래교통호재: " + ", ".join(items)
 
 
 def _stats_text(d: dict) -> str:
@@ -705,6 +734,7 @@ async def compare(
                 "nearby_redev":  d.get("nearby_redev", []),
                 "dong_projects": d.get("dong_projects", []),
                 "dev_grade":     d.get("dev_grade", "-"),
+                "future_transit": _future_transit_list(d.get("apt")),
                 "match_type":    d["match_type"],
                 "match_score":   d["match_score"],
             }
