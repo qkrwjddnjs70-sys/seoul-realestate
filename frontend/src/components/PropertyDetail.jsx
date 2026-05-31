@@ -35,6 +35,7 @@ export default function PropertyDetail({ property: initialProperty, onClose }) {
   const [savingFar, setSavingFar] = useState(false)
 
   const [costOpen, setCostOpen] = useState(false)
+  const [dev, setDev] = useState(null)
   const [editRedev, setEditRedev] = useState(false)
   const [stageInput, setStageInput] = useState('')
   const [detailInput, setDetailInput] = useState('')
