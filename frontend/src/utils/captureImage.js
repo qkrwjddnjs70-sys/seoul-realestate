@@ -5,30 +5,70 @@ import html2canvas from 'html2canvas'
  */
 async function _capture(el) {
   if (!el) throw new Error('no element')
-  // 스크롤 영역 전체를 캡처: 임시로 overflow 해제 + max-height 제거
-  const original = {
-    overflow:  el.style.overflow,
-    maxHeight: el.style.maxHeight,
-    height:    el.style.height,
+
+  // 캡처 대상 + 스크롤을 만드는 모든 조상(overflow auto/hidden/scroll)의
+  // 제약을 임시로 풀어 전체(가로·세로)가 캡처되게 한다.
+  const touched = []
+  function relax(node, isTarget) {
+    if (!node || node === document.body) return
+    const cs = getComputedStyle(node)
+    const needs =
+      isTarget ||
+      ['auto', 'scroll', 'hidden'].includes(cs.overflow) ||
+      ['auto', 'scroll', 'hidden'].includes(cs.overflowX) ||
+      ['auto', 'scroll', 'hidden'].includes(cs.overflowY)
+    if (needs) {
+      touched.push({
+        node,
+        overflow: node.style.overflow,
+        overflowX: node.style.overflowX,
+        overflowY: node.style.overflowY,
+        maxHeight: node.style.maxHeight,
+        maxWidth: node.style.maxWidth,
+        height: node.style.height,
+        width: node.style.width,
+      })
+      node.style.overflow = 'visible'
+      node.style.overflowX = 'visible'
+      node.style.overflowY = 'visible'
+      node.style.maxHeight = 'none'
+      node.style.maxWidth = 'none'
+      node.style.height = 'auto'
+      if (isTarget) node.style.width = node.scrollWidth + 'px'
+    }
   }
-  el.style.overflow  = 'visible'
-  el.style.maxHeight = 'none'
-  el.style.height    = 'auto'
+
+  // 대상 + 조상 8단계까지 relax
+  relax(el, true)
+  let p = el.parentElement, depth = 0
+  while (p && depth < 8) { relax(p, false); p = p.parentElement; depth++ }
+
+  // 레이아웃 반영 대기
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))
+
+  const w = el.scrollWidth
+  const h = el.scrollHeight
   try {
     return await html2canvas(el, {
       backgroundColor: '#ffffff',
       scale: 2,
       useCORS: true,
       logging: false,
-      width:        el.scrollWidth,
-      height:       el.scrollHeight,
-      windowWidth:  el.scrollWidth,
-      windowHeight: el.scrollHeight,
+      width: w,
+      height: h,
+      windowWidth: w,
+      windowHeight: h,
     })
   } finally {
-    el.style.overflow  = original.overflow
-    el.style.maxHeight = original.maxHeight
-    el.style.height    = original.height
+    for (const t of touched) {
+      t.node.style.overflow = t.overflow
+      t.node.style.overflowX = t.overflowX
+      t.node.style.overflowY = t.overflowY
+      t.node.style.maxHeight = t.maxHeight
+      t.node.style.maxWidth = t.maxWidth
+      t.node.style.height = t.height
+      t.node.style.width = t.width
+    }
   }
 }
 
