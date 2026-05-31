@@ -302,6 +302,81 @@ def get_property(property_id: int):
     raise HTTPException(status_code=404, detail="매물을 찾을 수 없습니다")
 
 
+# ─────────── 지역 개발성 (반경 700m 재건축 + 동 정비사업) ───────────
+import os as _os, json as _json, math as _math
+
+_GU_FULL = {
+    "11110":"종로구","11140":"중구","11170":"용산구","11200":"성동구","11215":"광진구",
+    "11230":"동대문구","11260":"중랑구","11290":"성북구","11305":"강북구","11320":"도봉구",
+    "11350":"노원구","11380":"은평구","11410":"서대문구","11440":"마포구","11470":"양천구",
+    "11500":"강서구","11530":"구로구","11545":"금천구","11560":"영등포구","11590":"동작구",
+    "11620":"관악구","11650":"서초구","11680":"강남구","11710":"송파구","11740":"강동구",
+}
+_DEAD = {"조합해산","조합청산","청산 및 조합해산","이전고시"}
+_CLEANUP = {}
+try:
+    _cjp = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "data", "cleanup_projects.json")
+    with open(_cjp, encoding="utf-8") as _f:
+        for _p in _json.load(_f):
+            _bd = re.match(r"([가-힣]+동)", _p.get("dong","") or "")
+            _key = (_p["gu"], _bd.group(1) if _bd else _p.get("dong",""))
+            _CLEANUP.setdefault(_key, []).append(_p)
+except Exception:
+    pass
+
+def _hav(la1, ln1, la2, ln2):
+    R=6371; dlat=_math.radians(la2-la1); dlng=_math.radians(ln2-ln1)
+    a=_math.sin(dlat/2)**2+_math.cos(_math.radians(la1))*_math.cos(_math.radians(la2))*_math.sin(dlng/2)**2
+    return R*2*_math.asin(_math.sqrt(a))
+
+
+@router.get("/{property_id}/development")
+def get_development(property_id: int):
+    """단지 주변 개발성 — 반경 700m 재건축 + 동 정비사업 (정보몽땅)"""
+    if not _use_db():
+        return {"nearby_redev": [], "dong_projects": []}
+    row = db_module.get_apartment_by_id(property_id)
+    if not row:
+        return {"nearby_redev": [], "dong_projects": []}
+    apt = dict(row)
+    nearby, projects = [], []
+    # 반경 700m 재건축
+    if apt.get("lat") and apt.get("lng"):
+        conn = db_module.get_db()
+        rows = conn.execute(
+            "SELECT id, display_name, name, lat, lng, redev_stage, redev_ai_stage "
+            "FROM apartments WHERE lawd_cd=? AND geocoded=1 "
+            "AND (redev_stage IS NOT NULL AND redev_stage!='' "
+            "  OR redev_ai_stage IS NOT NULL AND redev_ai_stage!='')",
+            (apt.get("lawd_cd"),)
+        ).fetchall()
+        conn.close()
+        for r in rows:
+            if r["id"] == property_id or not r["lat"] or not r["lng"]:
+                continue
+            d = _hav(apt["lat"], apt["lng"], r["lat"], r["lng"])
+            if 0 < d <= 0.7:
+                nearby.append({
+                    "name": r["display_name"] or r["name"],
+                    "dist_m": int(d*1000),
+                    "stage": r["redev_stage"] or r["redev_ai_stage"],
+                    "official": bool(r["redev_stage"]),
+                })
+        nearby.sort(key=lambda x: x["dist_m"]); nearby = nearby[:10]
+    # 동 정비사업
+    gu = _GU_FULL.get(apt.get("lawd_cd"))
+    m = re.search(r"([가-힣]+동)(?!구)(?:\d+가)?", apt.get("address") or "")
+    base_dong = m.group(1) if m else ""
+    if gu and base_dong:
+        seen = set()
+        for p in _CLEANUP.get((gu, base_dong), []):
+            if p["stage"] in _DEAD or p["name"] in seen:
+                continue
+            seen.add(p["name"])
+            projects.append({"name": p["name"][:30], "type": p["type"][:12], "stage": p["stage"]})
+    return {"nearby_redev": nearby, "dong_projects": projects, "dong": base_dong}
+
+
 @router.patch("/{property_id}/manual")
 def patch_manual(property_id: int, payload: dict):
     """단지 정보 수동 입력 — 사용자가 직접 알려주는 정확한 값 저장

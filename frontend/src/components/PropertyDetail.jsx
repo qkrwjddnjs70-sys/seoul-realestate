@@ -98,6 +98,11 @@ export default function PropertyDetail({ property: initialProperty, onClose }) {
       .then(r => setListings(r.data))
       .catch(() => setListings({ available: false }))
       .finally(() => setListingsLoading(false))
+
+    setDev(null)
+    axios.get(`/api/properties/${property.id}/development`)
+      .then(r => setDev(r.data))
+      .catch(() => setDev({ nearby_redev: [], dong_projects: [] }))
   }, [property?.id])
 
   if (!property) return null
@@ -362,6 +367,38 @@ export default function PropertyDetail({ property: initialProperty, onClose }) {
           <Stat label="층" value={`${property.floor}/${property.total_floors}층`} />
           <Stat label="버스" value={property.bus_routes.slice(0, 2).join(', ')} />
         </div>
+
+        {/* 지역 개발성 (반경 700m 재건축 + 동 정비사업) */}
+        {dev && (dev.nearby_redev?.length > 0 || dev.dong_projects?.length > 0) && (
+          <div className="border-b border-purple-100 bg-purple-50/30 px-6 py-3">
+            <p className="text-xs font-bold text-purple-700 mb-2">🏗 지역 개발성 <span className="font-normal text-purple-400">· 정비사업 정보몽땅</span></p>
+            {dev.nearby_redev?.length > 0 && (
+              <div className="mb-2">
+                <p className="text-xs text-gray-500 mb-1">반경 700m 재건축 진행 <b className="text-purple-700">{dev.nearby_redev.length}개</b></p>
+                <div className="flex flex-wrap gap-1">
+                  {dev.nearby_redev.map((n, k) => (
+                    <span key={k} className={`text-[11px] rounded-full px-2 py-0.5 border ${n.official ? 'bg-purple-50 border-purple-200 text-purple-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
+                      {n.name} <span className="text-gray-400">{n.dist_m}m</span> · {n.stage}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {dev.dong_projects?.length > 0 && (
+              <div>
+                <p className="text-xs text-gray-500 mb-1">{dev.dong} 정비사업 <b className="text-purple-700">{dev.dong_projects.length}건</b></p>
+                <div className="space-y-0.5 max-h-32 overflow-y-auto">
+                  {dev.dong_projects.map((p, k) => (
+                    <p key={k} className="text-[11px] text-gray-600">
+                      <span className={`inline-block w-14 ${p.type.includes('재건축') ? 'text-purple-600' : 'text-blue-500'}`}>[{p.type}]</span>
+                      {p.name} <span className="text-gray-400">· {p.stage}</span>
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 탭 */}
         <div className="flex border-b border-gray-100 px-6">
