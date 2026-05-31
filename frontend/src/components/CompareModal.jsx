@@ -77,14 +77,18 @@ export default function CompareModal({ open, onClose, onAfterCall }) {
   if (!open) return null
 
   const n = data?.targets?.length ?? activeCount
-  // 2~6개: 2~3개는 그 수만큼, 4개↑는 가독성 위해 3열
-  const gridCols = n <= 2 ? 'grid-cols-2' : 'grid-cols-3'
-  const inputCols = activeCount <= 2 ? 'grid-cols-2' : 'grid-cols-3'
+  // n개를 한 줄에 — Tailwind purge 대비 전체 클래스명 매핑
+  const COLS = {
+    1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-3',
+    4: 'grid-cols-4', 5: 'grid-cols-5', 6: 'grid-cols-6',
+  }
+  const gridCols = COLS[n] || 'grid-cols-3'
+  const inputCols = COLS[activeCount] || 'grid-cols-3'
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="relative flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+        className="relative flex max-h-[92vh] w-full max-w-[96vw] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
         {/* 헤더 */}
