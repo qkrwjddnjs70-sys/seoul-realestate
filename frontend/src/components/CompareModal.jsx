@@ -235,6 +235,20 @@ export default function CompareModal({ open, onClose, onAfterCall }) {
                       </div>
                     )}
 
+                    {/* 미래 교통호재 (GTX 등 예정노선) */}
+                    {side.future_transit?.length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-sky-100 text-xs">
+                        <p className="font-semibold text-sky-700 mb-1">🚄 미래 교통호재</p>
+                        <div className="flex flex-wrap gap-1">
+                          {side.future_transit.map((t, k) => (
+                            <span key={k} className="text-[11px] rounded-full bg-sky-50 border border-sky-200 text-sky-700 px-1.5 py-0.5">
+                              {t.line} {t.station}역 {t.walk_min}분·{t.status}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {/* 지역 개발성 (정비사업 정보몽땅) */}
                     {(side.nearby_redev?.length > 0 || side.dong_projects?.length > 0) && (
                       <div className="mt-2 pt-2 border-t border-purple-100 text-xs">
