@@ -385,9 +385,15 @@ export default function PropertyDetail({ property: initialProperty, onClose }) {
         )}
 
         {/* 지역 개발성 (반경 700m 재건축 + 동 정비사업) */}
-        {dev && (dev.nearby_redev?.length > 0 || dev.dong_projects?.length > 0) && (
+        {dev && (
           <div className="border-b border-purple-100 bg-purple-50/30 px-6 py-3">
             <p className="text-xs font-bold text-purple-700 mb-2">🏗 지역 개발성 <span className="font-normal text-purple-400">· 정비사업 정보몽땅</span></p>
+            {!(dev.nearby_redev?.length > 0) && !(dev.dong_projects?.length > 0) && (
+              <p className="text-xs text-gray-400">
+                {dev.dong ? `${dev.dong} 일대` : '인근'}에 진행 중인 정비사업·재건축이 없습니다
+                <span className="text-gray-300"> (신축 위주 지역)</span>
+              </p>
+            )}
             {dev.nearby_redev?.length > 0 && (
               <div className="mb-2">
                 <p className="text-xs text-gray-500 mb-1">반경 700m 재건축 진행 <b className="text-purple-700">{dev.nearby_redev.length}개</b></p>

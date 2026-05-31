@@ -257,7 +257,7 @@ export default function CompareModal({ open, onClose, onAfterCall }) {
                     )}
 
                     {/* 지역 개발성 (정비사업 정보몽땅) */}
-                    {(side.nearby_redev?.length > 0 || side.dong_projects?.length > 0) && (
+                    {side.apt && (
                       <div className="mt-2 pt-2 border-t border-purple-100 text-xs">
                         <div className="flex items-center justify-between mb-1">
                           <p className="font-semibold text-purple-700">🏗 지역 개발성</p>
@@ -270,6 +270,9 @@ export default function CompareModal({ open, onClose, onAfterCall }) {
                             </span>
                           )}
                         </div>
+                        {!(side.nearby_redev?.length > 0) && !(side.dong_projects?.length > 0) && (
+                          <p className="text-gray-400">진행 중인 정비사업·재건축 없음 <span className="text-gray-300">(신축 위주)</span></p>
+                        )}
                         {side.nearby_redev?.length > 0 && (
                           <div className="mb-1">
                             <p className="text-gray-500">반경 700m 재건축 <b className="text-purple-700">{side.nearby_redev.length}개</b></p>
