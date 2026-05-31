@@ -105,29 +105,28 @@ export default function App() {
             </button>
           )}
 
-          {/* 비교 분석 버튼 — 호재 검색 바로 아래 */}
-          <button
-            onClick={() => setCompareOpen(true)}
-            className="absolute bottom-14 right-4 z-[1000] flex items-center gap-1.5 rounded-full bg-indigo-600 hover:bg-indigo-700 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors"
-          >
-            ⚖️ 단지·지역 비교
-          </button>
-
-          {/* 종합 AI 분석 버튼 — 비교 분석 위 */}
-          <button
-            onClick={() => setAiFilterOpen(true)}
-            className="absolute bottom-[152px] right-4 z-[1000] flex items-center gap-1.5 rounded-full bg-purple-600 hover:bg-purple-700 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors"
-          >
-            🤖 종합 AI 분석
-          </button>
-
-          {/* 현재 화면 검색 버튼 — 가장 아래(목록 보기 위) */}
-          <button
-            onClick={() => mapBounds && setSearchBounds({ ...mapBounds })}
-            className="absolute bottom-14 left-4 z-[1000] flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors"
-          >
-            🔍 현재 화면 검색
-          </button>
+          {/* 좌하단 액션 버튼 3개 — 한 줄로 묶음 */}
+          <div className="absolute bottom-4 left-4 z-[1000] flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => mapBounds && setSearchBounds({ ...mapBounds })}
+              className="flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors"
+              title="현재 보이는 화면의 단지를 목록에 표시"
+            >
+              🔍 현재 화면 검색
+            </button>
+            <button
+              onClick={() => setAiFilterOpen(true)}
+              className="flex items-center gap-1.5 rounded-full bg-purple-600 hover:bg-purple-700 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors"
+            >
+              🤖 종합 AI 분석
+            </button>
+            <button
+              onClick={() => setCompareOpen(true)}
+              className="flex items-center gap-1.5 rounded-full bg-indigo-600 hover:bg-indigo-700 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors"
+            >
+              ⚖️ 단지·지역 비교
+            </button>
+          </div>
 
           <button
             onClick={() => setListOpen(p => !p)}
