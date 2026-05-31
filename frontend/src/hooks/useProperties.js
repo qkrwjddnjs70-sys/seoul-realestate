@@ -31,6 +31,7 @@ export function useProperties(filters, bounds) {
       if (f.lawdCds?.length)            params.lawd_cd              = f.lawdCds.join(',')
       if (f.dongs?.length)              params.dong                 = f.dongs.join(',')
       if (f.areaBands?.length)          params.area_bands           = f.areaBands.join(',')
+      if (f.redevStages?.length)        params.redev_stages         = f.redevStages.join(',')
 
       // 구/동 선택 시 bounds 필터 생략
       const useBounds = b && !(f.lawdCds?.length) && !(f.dongs?.length)
