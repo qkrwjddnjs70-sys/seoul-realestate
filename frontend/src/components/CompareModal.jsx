@@ -91,7 +91,7 @@ export default function CompareModal({ open, onClose, onAfterCall }) {
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
           <div>
             <h2 className="text-lg font-bold text-gray-900">⚖️ 단지·지역 비교 분석</h2>
-            <p className="text-xs text-gray-400 mt-0.5">단지명(예: 신길우성2차) 또는 지역명(예: 신길, 마포) — 최대 3개</p>
+            <p className="text-xs text-gray-400 mt-0.5">단지명(예: 신길우성2차) 또는 지역명(예: 신길, 마포) — 최대 6개</p>
           </div>
           <div className="flex items-center gap-2">
             {data && <CaptureButtons targetRef={captureRef} filename={`비교_${(data.targets||[]).map(t=>t.label).join('_vs_')}.png`} />}
@@ -101,7 +101,7 @@ export default function CompareModal({ open, onClose, onAfterCall }) {
 
         {/* 입력 */}
         <div className="border-b border-gray-100 bg-gray-50 px-6 py-4">
-          <div className={`grid gap-2 ${activeCount === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          <div className={`grid gap-2 ${inputCols}`}>
             {targets.slice(0, activeCount).map((t, i) => (
               <input
                 key={i}
@@ -116,14 +116,15 @@ export default function CompareModal({ open, onClose, onAfterCall }) {
           </div>
           <div className="flex items-center justify-between mt-3">
             <div className="flex gap-2">
-              {activeCount === 2 ? (
+              {activeCount < 6 && (
                 <button
-                  onClick={() => setActiveCount(3)}
+                  onClick={() => setActiveCount(activeCount + 1)}
                   className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-                >+ 대상 추가 (3개까지)</button>
-              ) : (
+                >+ 대상 추가 ({activeCount}/6)</button>
+              )}
+              {activeCount > 2 && (
                 <button
-                  onClick={() => { setActiveCount(2); setTarget(2, '') }}
+                  onClick={() => { setTarget(activeCount - 1, ''); setActiveCount(activeCount - 1) }}
                   className="text-xs text-gray-500 hover:text-gray-700"
                 >− 대상 제거</button>
               )}
