@@ -308,6 +308,7 @@ async def _collect_for(target: str) -> dict:
 
     # ─ 지역 개발성: 반경 700m 재건축 밀집 + 동 정비사업 목록 ─
     nearby_redev, dong_projects = _development_context(apt)
+    dev_grade, dev_score = _dev_grade(apt, nearby_redev, dong_projects)
 
     return {
         "label":        label,
@@ -318,9 +319,45 @@ async def _collect_for(target: str) -> dict:
         "region_stats": region_stats,
         "nearby_redev": nearby_redev,
         "dong_projects": dong_projects,
+        "dev_grade":    dev_grade,
+        "dev_score":    dev_score,
         "match_type":   (apt or {}).get("_match_type"),
         "match_score":  (apt or {}).get("_match_score"),
     }
+
+
+# 단계별 진행도 점수 (높을수록 진행됨)
+_STAGE_WEIGHT = {
+    "안전진단": 1, "정비구역지정": 1, "추진위원회승인": 2, "조합설립인가": 3,
+    "시공사선정": 4, "사업시행인가": 5, "관리처분인가": 6, "이주철거": 6, "착공": 7, "준공": 2,
+}
+
+def _dev_grade(apt, nearby, projects):
+    """지역 개발성 상/중/하 — 데이터 기반 점수
+    ① 본 단지 재건축 진행도 ② 반경700m 재건축 밀집 ③ 동 재건축 사업 수
+    """
+    if not apt:
+        return "-", 0
+    score = 0.0
+    # ① 본 단지 진행 단계 (정보몽땅/수동 우선, AI추정 절반)
+    own = apt.get("redev_stage")
+    if own:
+        score += _STAGE_WEIGHT.get(own, 0) * 1.5
+    elif apt.get("redev_ai_stage"):
+        score += _STAGE_WEIGHT.get(apt.get("redev_ai_stage"), 0) * 0.7
+    # ② 반경700m 재건축 밀집도 (공식 1.5 / 추정 0.7점, 최대 6점)
+    near_pts = sum(1.5 if n.get("official") else 0.7 for n in (nearby or []))
+    score += min(near_pts, 6)
+    # ③ 동 재건축(아파트→아파트) 사업 수 — 주거가치 직결 (재개발은 0.3 가중)
+    redev_cnt = sum(1 for p in (projects or []) if "재건축" in p.get("type", ""))
+    redev_cnt2 = sum(0.3 for p in (projects or []) if "재건축" not in p.get("type", ""))
+    score += min(redev_cnt * 0.8 + redev_cnt2, 5)
+
+    if score >= 11:
+        return "상", round(score, 1)
+    if score >= 6:
+        return "중", round(score, 1)
+    return "하", round(score, 1)
 
 
 def _development_context(apt: dict | None):
@@ -667,6 +704,7 @@ async def compare(
                 "infra":         d["infra"],
                 "nearby_redev":  d.get("nearby_redev", []),
                 "dong_projects": d.get("dong_projects", []),
+                "dev_grade":     d.get("dev_grade", "-"),
                 "match_type":    d["match_type"],
                 "match_score":   d["match_score"],
             }

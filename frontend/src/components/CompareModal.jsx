@@ -238,7 +238,17 @@ export default function CompareModal({ open, onClose, onAfterCall }) {
                     {/* 지역 개발성 (정비사업 정보몽땅) */}
                     {(side.nearby_redev?.length > 0 || side.dong_projects?.length > 0) && (
                       <div className="mt-2 pt-2 border-t border-purple-100 text-xs">
-                        <p className="font-semibold text-purple-700 mb-1">🏗 지역 개발성</p>
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="font-semibold text-purple-700">🏗 지역 개발성</p>
+                          {side.dev_grade && side.dev_grade !== '-' && (
+                            <span className={`text-[11px] font-bold rounded-full px-2 py-0.5 ${
+                              side.dev_grade === '상' ? 'bg-red-100 text-red-700'
+                              : side.dev_grade === '중' ? 'bg-amber-100 text-amber-700'
+                              : 'bg-gray-100 text-gray-500'}`}>
+                              개발성 {side.dev_grade}
+                            </span>
+                          )}
+                        </div>
                         {side.nearby_redev?.length > 0 && (
                           <div className="mb-1">
                             <p className="text-gray-500">반경 700m 재건축 <b className="text-purple-700">{side.nearby_redev.length}개</b></p>
