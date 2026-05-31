@@ -179,6 +179,7 @@ def get_properties(
     dong:                Optional[str]   = Query(None),
     area_bands:          Optional[str]   = Query(None),
     bounds_size:         Optional[float] = Query(None),
+    redev_stages:        Optional[str]   = Query(None),
 ):
     hojae_list = [t.strip() for t in hojaes.split(",") if t.strip()] if hojaes else None
 
@@ -203,6 +204,7 @@ def get_properties(
             dong=dong,
             area_bands=area_bands,
             bounds_size=bounds_size,
+            redev_stages=redev_stages,
         )
         items = [_db_to_property(r) for r in rows]
         is_mock = False

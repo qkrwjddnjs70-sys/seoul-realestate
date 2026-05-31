@@ -133,6 +133,22 @@ def get_apartments(
     if subway_station:
         clauses.append("nearest_subway LIKE ?")
         params.append(f"%{subway_station}%")
+
+    # 재건축/재개발 단계 필터 — 정보몽땅·수동·AI 중 하나라도 단계 있으면 매칭
+    if redev_stages:
+        wanted = [s.strip() for s in redev_stages.split(",") if s.strip()]
+        if wanted:
+            if "any" in wanted:
+                # '진행중 전체' — 단계가 있고 준공이 아닌 단지
+                clauses.append(
+                    "((redev_stage IS NOT NULL AND redev_stage!='' AND redev_stage!='준공') "
+                    " OR (redev_ai_stage IS NOT NULL AND redev_ai_stage!='' AND redev_ai_stage!='준공'))"
+                )
+            else:
+                ph = ",".join("?" * len(wanted))
+                clauses.append(f"(redev_stage IN ({ph}) OR redev_ai_stage IN ({ph}))")
+                params.extend(wanted)
+                params.extend(wanted)
     if apt_name:
         # 띄어쓰기·끝의 "차"/"단지"/"아파트" 제거 후 양쪽(display_name + name) 매칭.
         import re as _re
