@@ -88,6 +88,7 @@ def get_apartments(
     dong=None,
     area_bands=None,    # "50,80" 등 — 50/80㎡대 필터
     bounds_size=None,   # lng_max - lng_min (뷰포트 크기)
+    redev_stages=None,  # "사업시행인가,조합설립인가" 또는 "any" — 재건축 단계 필터
     limit=800,
 ) -> list[dict]:
     conn = get_db()
