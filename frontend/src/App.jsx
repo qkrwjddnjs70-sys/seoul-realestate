@@ -22,6 +22,27 @@ export default function App() {
   const [aiFilterOpen, setAiFilterOpen] = useState(false)
   const [usageRefresh, setUsageRefresh] = useState(0)
   const bumpUsage = useCallback(() => setUsageRefresh(k => k + 1), [])
+  const [zoneQuery, setZoneQuery] = useState('')
+  const [redevZones, setRedevZones] = useState([])
+
+  async function searchZones() {
+    const q = zoneQuery.trim()
+    if (!q) { setRedevZones([]); return }
+    try {
+      const r = await fetch(`/api/redev-zones/search?q=${encodeURIComponent(q)}`)
+      const j = await r.json()
+      setRedevZones(j.zones || [])
+      if (j.zones?.length) {
+        // 첫 결과로 지도 이동
+        const z = j.zones[0]
+        mapRef.current?.flyTo(z.lat, z.lng, 15)
+      } else {
+        alert('해당 정비사업 구역을 찾지 못했습니다')
+      }
+    } catch {
+      setRedevZones([])
+    }
+  }
 
   const { properties, total, loading } = useProperties(filters, mapBounds)
 
@@ -81,10 +102,37 @@ export default function App() {
           <NaverMap
             ref={mapRef}
             properties={properties}
+            redevZones={redevZones}
             selectedId={selectedProperty?.id ?? null}
             onMarkerClick={handleMarkerClick}
             onBoundsChange={handleBoundsChange}
           />
+
+          {/* 정비사업 구역 검색 (지도 상단 중앙) */}
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-1 rounded-full bg-white shadow-lg border border-gray-200 px-2 py-1">
+            <span className="text-sm pl-1">🏗️</span>
+            <input
+              type="text"
+              value={zoneQuery}
+              onChange={e => setZoneQuery(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && searchZones()}
+              placeholder="정비사업 검색 (예: 문래동4가, 신길뉴타운)"
+              className="w-56 text-sm outline-none px-1 py-0.5"
+            />
+            {redevZones.length > 0 && (
+              <button onClick={() => { setZoneQuery(''); setRedevZones([]) }}
+                className="text-gray-300 hover:text-gray-500 text-sm px-1">✕</button>
+            )}
+            <button onClick={searchZones}
+              className="rounded-full bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold px-3 py-1">
+              검색
+            </button>
+          </div>
+          {redevZones.length > 0 && (
+            <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[1000] rounded-full bg-purple-50 border border-purple-200 text-purple-700 text-xs px-3 py-1 shadow">
+              정비사업 {redevZones.length}곳 표시 중
+            </div>
+          )}
 
           {/* 마커 클릭 시 뜨는 정보 카드 */}
           {selectedProperty && (

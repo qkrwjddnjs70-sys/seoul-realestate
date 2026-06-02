@@ -59,10 +59,11 @@ const SCHOOL_STYLE = {
   '고': { color: '#ea580c', label: '고' },
 }
 
-const NaverMap = forwardRef(function NaverMap({ properties, selectedId, onMarkerClick, onBoundsChange }, ref) {
+const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], selectedId, onMarkerClick, onBoundsChange }, ref) {
   const mapRef = useRef(null)
   const mapInstance = useRef(null)
   const markersRef = useRef([])   // [{marker, id}]
+  const zoneLayerRef = useRef(null)   // 정비사업 구역 마커 레이어
   const subwayLayerRef = useRef(null)
   const schoolLayerRef = useRef(null)
   const schoolDataRef = useRef(null)
@@ -155,6 +156,42 @@ const NaverMap = forwardRef(function NaverMap({ properties, selectedId, onMarker
       return { marker, id: p.id }
     })
   }, [properties, selectedId, onMarkerClick])
+
+  // 정비사업 구역 마커 (검색 결과)
+  useEffect(() => {
+    if (!mapInstance.current) return
+    zoneLayerRef.current?.remove()
+    zoneLayerRef.current = null
+    if (!redevZones.length) return
+    const group = L.layerGroup()
+    redevZones.forEach(z => {
+      const isRedev = (z.type || '').includes('재건축')
+      const color = isRedev ? '#7c3aed' : '#dc2626'  // 재건축 보라 / 재개발 빨강
+      const icon = L.divIcon({
+        className: '',
+        html: `<div style="position:relative;transform:translate(-50%,-100%);white-space:nowrap;">
+            <div style="background:${color};color:#fff;font-size:11px;font-weight:700;padding:3px 8px;
+                        border-radius:12px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4);">
+              🏗️ ${z.name.length > 16 ? z.name.slice(0,16)+'…' : z.name}
+            </div>
+            <div style="position:absolute;left:50%;top:100%;transform:translateX(-50%);
+                        width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;
+                        border-top:6px solid ${color};"></div>
+          </div>`,
+        iconSize: [0, 0],
+      })
+      const m = L.marker([z.lat, z.lng], { icon, zIndexOffset: 2000 })
+      m.bindPopup(
+        `<div style="font-size:12px;line-height:1.5">
+           <b>${z.name}</b><br/>
+           <span style="color:#666">${z.type} · ${z.stage}</span><br/>
+           <span style="color:#999">${z.gu} ${z.jibun}</span>
+         </div>`)
+      m.addTo(group)
+    })
+    group.addTo(mapInstance.current)
+    zoneLayerRef.current = group
+  }, [redevZones])
 
   // 지하철 노선도
   useEffect(() => {

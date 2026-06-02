@@ -11,6 +11,7 @@ from routers import schools
 from routers import compare
 from routers import ai_filter
 from routers import listings
+from routers import redev_zones
 
 app = FastAPI(title="서울 부동산 API", version="2.0.0")
 
@@ -32,6 +33,7 @@ app.include_router(schools.router,   prefix="/api/schools",    tags=["schools"])
 app.include_router(compare.router,   prefix="/api/compare",    tags=["compare"])
 app.include_router(ai_filter.router, prefix="/api/ai-filter",  tags=["ai-filter"])
 app.include_router(listings.router,  prefix="/api/listings",   tags=["listings"])
+app.include_router(redev_zones.router, prefix="/api/redev-zones", tags=["redev-zones"])
 
 
 @app.get("/")
