@@ -207,74 +207,7 @@ export default function FilterPanel({ filters, onChange, total, loading, onGuSel
 
         <hr className="border-gray-100" />
 
-        {/* 재건축·재개발 호재 */}
-        <section>
-          <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-gray-800">
-            🏗️ 재건축·재개발 단계
-          </h2>
-          <div className="flex flex-wrap gap-1.5">
-            {[
-              { v: 'any',         label: '진행중 전체' },
-              { v: '안전진단',     label: '안전진단' },
-              { v: '정비구역지정', label: '정비구역지정' },
-              { v: '추진위원회승인', label: '추진위' },
-              { v: '조합설립인가', label: '조합설립' },
-              { v: '시공사선정',   label: '시공사선정' },
-              { v: '사업시행인가', label: '사업시행인가' },
-              { v: '관리처분인가', label: '관리처분' },
-              { v: '이주철거',     label: '이주·철거' },
-              { v: '착공',         label: '착공' },
-            ].map(({ v, label }) => {
-              const stages = filters.redevStages ?? []
-              const active = stages.includes(v)
-              return (
-                <button
-                  key={v}
-                  onClick={() => {
-                    let next
-                    if (v === 'any') {
-                      next = active ? [] : ['any']
-                    } else {
-                      const base = stages.filter(s => s !== 'any')
-                      next = active ? base.filter(s => s !== v) : [...base, v]
-                    }
-                    onChange({ ...filters, redevStages: next })
-                  }}
-                  className={`rounded-full px-2.5 py-1 text-xs font-medium border transition-all ${
-                    active
-                      ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
-                      : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-purple-300 hover:text-purple-600'
-                  }`}
-                >
-                  {label}
-                </button>
-              )
-            })}
-          </div>
-          <p className="mt-1.5 text-xs text-gray-400">정비사업 정보몽땅 공식 + AI 추정 기준</p>
-
-          {/* 정비사업 전체 보기 토글 */}
-          <button
-            onClick={() => onToggleAllZones?.(!showAllZones)}
-            className={`mt-2 w-full rounded-lg border px-3 py-2 text-xs font-semibold transition-all flex items-center justify-between ${
-              showAllZones
-                ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
-                : 'bg-white text-purple-700 border-purple-200 hover:border-purple-400'
-            }`}
-          >
-            <span>🏗️ 서울시 정비사업 지도에 표시</span>
-            <span className={showAllZones ? 'text-purple-100' : 'text-purple-400'}>
-              {showAllZones ? `ON (${zoneCount})` : 'OFF'}
-            </span>
-          </button>
-          {showAllZones && (
-            <p className="mt-1 text-[11px] text-purple-500">지도에 정비사업 구역이 🏗️ 마커로 표시됩니다 (클릭 시 단계·세대수)</p>
-          )}
-        </section>
-
-        <hr className="border-gray-100" />
-
-        {/* 구 선택 (다중) */}
+        {/* 구 선택 (다중) — 위로 이동 */}
         <section>
           <h2 className="mb-1.5 flex items-center justify-between text-sm font-semibold text-gray-800">
             <span>🗺️ 구 선택 <span className="text-xs font-normal text-gray-400">(복수 선택 가능)</span></span>
@@ -357,6 +290,80 @@ export default function FilterPanel({ filters, onChange, total, loading, onGuSel
             </section>
           </>
         )}
+
+        <hr className="border-gray-100" />
+
+        {/* 재건축·재개발 단계 — 구 선택 아래로 이동 */}
+        <section>
+          <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-gray-800">
+            🏗️ 재건축·재개발 단계
+            {selectedGuNames.length > 0 && (
+              <span className="text-xs font-normal text-purple-500">· {selectedGuNames.join('·')}</span>
+            )}
+          </h2>
+          <div className="flex flex-wrap gap-1.5">
+            {[
+              { v: 'any',         label: '진행중 전체' },
+              { v: '안전진단',     label: '안전진단' },
+              { v: '정비구역지정', label: '정비구역지정' },
+              { v: '추진위원회승인', label: '추진위' },
+              { v: '조합설립인가', label: '조합설립' },
+              { v: '시공사선정',   label: '시공사선정' },
+              { v: '사업시행인가', label: '사업시행인가' },
+              { v: '관리처분인가', label: '관리처분' },
+              { v: '이주철거',     label: '이주·철거' },
+              { v: '착공',         label: '착공' },
+            ].map(({ v, label }) => {
+              const stages = filters.redevStages ?? []
+              const active = stages.includes(v)
+              return (
+                <button
+                  key={v}
+                  onClick={() => {
+                    let next
+                    if (v === 'any') {
+                      next = active ? [] : ['any']
+                    } else {
+                      const base = stages.filter(s => s !== 'any')
+                      next = active ? base.filter(s => s !== v) : [...base, v]
+                    }
+                    onChange({ ...filters, redevStages: next })
+                  }}
+                  className={`rounded-full px-2.5 py-1 text-xs font-medium border transition-all ${
+                    active
+                      ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                      : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-purple-300 hover:text-purple-600'
+                  }`}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+          <p className="mt-1.5 text-xs text-gray-400">
+            {selectedGuNames.length > 0
+              ? `${selectedGuNames.join('·')} 단지만 단계 필터됩니다`
+              : '구를 먼저 선택하면 그 구의 단지만 필터됩니다'}
+          </p>
+
+          {/* 정비사업 전체 보기 토글 */}
+          <button
+            onClick={() => onToggleAllZones?.(!showAllZones)}
+            className={`mt-2 w-full rounded-lg border px-3 py-2 text-xs font-semibold transition-all flex items-center justify-between ${
+              showAllZones
+                ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                : 'bg-white text-purple-700 border-purple-200 hover:border-purple-400'
+            }`}
+          >
+            <span>🏗️ {selectedGuNames.length > 0 ? `${selectedGuNames.join('·')} 정비사업 지도표시` : '서울시 정비사업 지도표시'}</span>
+            <span className={showAllZones ? 'text-purple-100' : 'text-purple-400'}>
+              {showAllZones ? `ON (${zoneCount})` : 'OFF'}
+            </span>
+          </button>
+          {showAllZones && (
+            <p className="mt-1 text-[11px] text-purple-500">지도에 정비사업이 🏗️ 마커로 표시됩니다 (클릭 시 단계·세대수)</p>
+          )}
+        </section>
 
         <hr className="border-gray-100" />
 

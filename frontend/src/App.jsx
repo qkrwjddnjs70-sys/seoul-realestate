@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
-import FilterPanel, { HOJAE_STYLE } from './components/FilterPanel'
+import FilterPanel, { HOJAE_STYLE, GU_LIST } from './components/FilterPanel'
 import NaverMap from './components/NaverMap'
 import PropertyDetail from './components/PropertyDetail'
 import CompareModal from './components/CompareModal'
@@ -26,16 +26,30 @@ export default function App() {
   const [redevZones, setRedevZones] = useState([])
   const [showAllZones, setShowAllZones] = useState(false)
 
-  // "정비사업 전체 보기" 토글 → 811개 전부 지도에
+  // "정비사업 보기" 토글 → 선택 구가 있으면 그 구만, 없으면 서울 전체
   useEffect(() => {
     if (!showAllZones) return
     let cancelled = false
-    fetch('/api/redev-zones/all')
-      .then(r => r.json())
-      .then(j => { if (!cancelled) setRedevZones(j.zones || []) })
-      .catch(() => {})
+    const guNames = (filters.lawdCds || [])
+      .map(c => GU_LIST.find(g => g.lawd_cd === c)?.name)
+      .filter(Boolean)
+    ;(async () => {
+      try {
+        let zones = []
+        if (guNames.length) {
+          const results = await Promise.all(
+            guNames.map(gu => fetch(`/api/redev-zones/all?gu=${encodeURIComponent(gu)}`).then(r => r.json()))
+          )
+          zones = results.flatMap(j => j.zones || [])
+        } else {
+          const j = await (await fetch('/api/redev-zones/all')).json()
+          zones = j.zones || []
+        }
+        if (!cancelled) setRedevZones(zones)
+      } catch { /* ignore */ }
+    })()
     return () => { cancelled = true }
-  }, [showAllZones])
+  }, [showAllZones, filters.lawdCds])
 
   function toggleAllZones(on) {
     setShowAllZones(on)
