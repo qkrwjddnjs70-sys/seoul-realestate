@@ -24,6 +24,23 @@ export default function App() {
   const bumpUsage = useCallback(() => setUsageRefresh(k => k + 1), [])
   const [zoneQuery, setZoneQuery] = useState('')
   const [redevZones, setRedevZones] = useState([])
+  const [showAllZones, setShowAllZones] = useState(false)
+
+  // "정비사업 전체 보기" 토글 → 811개 전부 지도에
+  useEffect(() => {
+    if (!showAllZones) return
+    let cancelled = false
+    fetch('/api/redev-zones/all')
+      .then(r => r.json())
+      .then(j => { if (!cancelled) setRedevZones(j.zones || []) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [showAllZones])
+
+  function toggleAllZones(on) {
+    setShowAllZones(on)
+    if (!on) { setRedevZones([]); setZoneQuery('') }
+  }
 
   async function searchZones() {
     const q = zoneQuery.trim()
@@ -94,6 +111,9 @@ export default function App() {
         total={total}
         loading={loading}
         onGuSelect={handleGuSelect}
+        showAllZones={showAllZones}
+        onToggleAllZones={toggleAllZones}
+        zoneCount={redevZones.length}
       />
 
       <div className="flex flex-1 flex-col overflow-hidden">

@@ -97,7 +97,7 @@ function RangeRow({ label, min, max, value, onChange, unit, step = 1 }) {
   )
 }
 
-export default function FilterPanel({ filters, onChange, total, loading, onGuSelect }) {
+export default function FilterPanel({ filters, onChange, total, loading, onGuSelect, showAllZones, onToggleAllZones, zoneCount = 0 }) {
   const [stationInput, setStationInput] = useState(filters.subwayStation || '')
   const [aptNameInput, setAptNameInput] = useState(filters.aptName || '')
   const [dongList, setDongList] = useState([])
@@ -252,6 +252,24 @@ export default function FilterPanel({ filters, onChange, total, loading, onGuSel
             })}
           </div>
           <p className="mt-1.5 text-xs text-gray-400">정비사업 정보몽땅 공식 + AI 추정 기준</p>
+
+          {/* 정비사업 전체 보기 토글 */}
+          <button
+            onClick={() => onToggleAllZones?.(!showAllZones)}
+            className={`mt-2 w-full rounded-lg border px-3 py-2 text-xs font-semibold transition-all flex items-center justify-between ${
+              showAllZones
+                ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                : 'bg-white text-purple-700 border-purple-200 hover:border-purple-400'
+            }`}
+          >
+            <span>🏗️ 서울시 정비사업 지도에 표시</span>
+            <span className={showAllZones ? 'text-purple-100' : 'text-purple-400'}>
+              {showAllZones ? `ON (${zoneCount})` : 'OFF'}
+            </span>
+          </button>
+          {showAllZones && (
+            <p className="mt-1 text-[11px] text-purple-500">지도에 정비사업 구역이 🏗️ 마커로 표시됩니다 (클릭 시 단계·세대수)</p>
+          )}
         </section>
 
         <hr className="border-gray-100" />
