@@ -167,12 +167,16 @@ const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], sel
     redevZones.forEach(z => {
       const isRedev = (z.type || '').includes('재건축')
       const color = isRedev ? '#7c3aed' : '#dc2626'  // 재건축 보라 / 재개발 빨강
+      const shortNm = z.name.length > 14 ? z.name.slice(0, 14) + '…' : z.name
+      const unitsBadge = z.units
+        ? `<span style="background:rgba(255,255,255,.25);border-radius:8px;padding:0 5px;margin-left:4px;">${z.units.toLocaleString()}세대</span>`
+        : ''
       const icon = L.divIcon({
         className: '',
         html: `<div style="position:relative;transform:translate(-50%,-100%);white-space:nowrap;">
             <div style="background:${color};color:#fff;font-size:11px;font-weight:700;padding:3px 8px;
                         border-radius:12px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4);">
-              🏗️ ${z.name.length > 16 ? z.name.slice(0,16)+'…' : z.name}
+              🏗️ ${shortNm}${unitsBadge}
             </div>
             <div style="position:absolute;left:50%;top:100%;transform:translateX(-50%);
                         width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;
@@ -182,10 +186,11 @@ const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], sel
       })
       const m = L.marker([z.lat, z.lng], { icon, zIndexOffset: 2000 })
       m.bindPopup(
-        `<div style="font-size:12px;line-height:1.5">
+        `<div style="font-size:12px;line-height:1.6">
            <b>${z.name}</b><br/>
            <span style="color:#666">${z.type} · ${z.stage}</span><br/>
-           <span style="color:#999">${z.gu} ${z.jibun}</span>
+           ${z.units ? `<span style="color:${color};font-weight:700">${z.units.toLocaleString()}세대 예정</span><br/>` : ''}
+           <span style="color:#999">${z.gu} ${z.jibun || ''}</span>
          </div>`)
       m.addTo(group)
     })
