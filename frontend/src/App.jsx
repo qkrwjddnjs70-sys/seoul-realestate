@@ -177,17 +177,7 @@ export default function App() {
             />
           )}
 
-          {/* 호재 검색 버튼 — 단지 선택 시만 */}
-          {selectedProperty && (
-            <button
-              onClick={() => setHojaeOpen(true)}
-              className="absolute bottom-24 right-4 z-[1000] flex items-center gap-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors"
-            >
-              📰 호재 검색
-            </button>
-          )}
-
-          {/* 좌하단 액션 버튼 3개 — 한 줄로 묶음 */}
+          {/* 좌하단 액션 버튼 — 한 줄로 묶음 */}
           <div className="absolute bottom-4 left-4 z-[1000] flex flex-wrap items-center gap-2">
             <button
               onClick={() => mapBounds && setSearchBounds({ ...mapBounds })}
@@ -207,6 +197,19 @@ export default function App() {
               className="flex items-center gap-1.5 rounded-full bg-indigo-600 hover:bg-indigo-700 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors"
             >
               ⚖️ 단지·지역 비교
+            </button>
+            {/* 호재 검색 — 단지 선택 시만 활성 */}
+            <button
+              onClick={() => selectedProperty && setHojaeOpen(true)}
+              disabled={!selectedProperty}
+              title={selectedProperty ? '선택한 단지의 호재 검색' : '먼저 단지를 선택하세요'}
+              className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors ${
+                selectedProperty
+                  ? 'bg-emerald-600 hover:bg-emerald-700'
+                  : 'bg-emerald-600/40 cursor-not-allowed'
+              }`}
+            >
+              📰 호재 검색
             </button>
           </div>
 
