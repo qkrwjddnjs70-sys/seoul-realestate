@@ -160,8 +160,8 @@ export default function App() {
             ☰ 필터
           </button>
 
-          {/* 정비사업 구역 검색 (데스크탑 상단중앙 / 모바일 우상단) */}
-          <div className="absolute top-3 right-3 left-auto translate-x-0 md:left-1/2 md:right-auto md:-translate-x-1/2 z-[1000] flex items-center gap-1 rounded-full bg-white shadow-lg border border-gray-200 px-2 py-1 max-w-[calc(100vw-6rem)] md:max-w-none">
+          {/* 정비사업 구역 검색 (상단중앙, 모바일은 한 줄 아래) */}
+          <div className="absolute top-16 md:top-3 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-1 rounded-full bg-white shadow-lg border border-gray-200 px-2 py-1 max-w-[calc(100vw-1.5rem)] md:max-w-none">
             <span className="text-sm pl-1">🏗️</span>
             <input
               type="text"
@@ -181,7 +181,7 @@ export default function App() {
             </button>
           </div>
           {redevZones.length > 0 && (
-            <div className="absolute top-16 right-3 left-auto translate-x-0 md:top-14 md:left-1/2 md:right-auto md:-translate-x-1/2 z-[1000] rounded-full bg-purple-50 border border-purple-200 text-purple-700 text-xs px-3 py-1 shadow whitespace-nowrap">
+            <div className="absolute top-28 md:top-14 left-1/2 -translate-x-1/2 z-[1000] rounded-full bg-purple-50 border border-purple-200 text-purple-700 text-xs px-3 py-1 shadow whitespace-nowrap">
               정비사업 {redevZones.length}곳 표시 중
             </div>
           )}
