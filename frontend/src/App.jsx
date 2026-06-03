@@ -22,6 +22,7 @@ export default function App() {
   const [aiFilterOpen, setAiFilterOpen] = useState(false)
   const [usageRefresh, setUsageRefresh] = useState(0)
   const bumpUsage = useCallback(() => setUsageRefresh(k => k + 1), [])
+  const [filterOpen, setFilterOpen] = useState(false)
   const [zoneQuery, setZoneQuery] = useState('')
   const [redevZones, setRedevZones] = useState([])
   const [showAllZones, setShowAllZones] = useState(false)
@@ -119,15 +120,24 @@ export default function App() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-gray-50">
+      {/* 모바일 필터 드로어 배경 */}
+      {filterOpen && (
+        <div
+          className="fixed inset-0 z-[2400] bg-black/40 md:hidden"
+          onClick={() => setFilterOpen(false)}
+        />
+      )}
       <FilterPanel
         filters={filters}
         onChange={setFilters}
         total={total}
         loading={loading}
-        onGuSelect={handleGuSelect}
+        onGuSelect={(gu) => { handleGuSelect(gu); setFilterOpen(false) }}
         showAllZones={showAllZones}
         onToggleAllZones={toggleAllZones}
         zoneCount={redevZones.length}
+        open={filterOpen}
+        onClose={() => setFilterOpen(false)}
       />
 
       <div className="flex flex-1 flex-col overflow-hidden">
@@ -142,16 +152,24 @@ export default function App() {
             onBoundsChange={handleBoundsChange}
           />
 
-          {/* 정비사업 구역 검색 (지도 상단 중앙) */}
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-1 rounded-full bg-white shadow-lg border border-gray-200 px-2 py-1">
+          {/* 모바일 전용 필터 열기 버튼 */}
+          <button
+            onClick={() => setFilterOpen(true)}
+            className="md:hidden absolute top-3 left-3 z-[1000] flex items-center gap-1.5 rounded-full bg-white shadow-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-800"
+          >
+            ☰ 필터
+          </button>
+
+          {/* 정비사업 구역 검색 (데스크탑 상단중앙 / 모바일 우상단) */}
+          <div className="absolute top-3 right-3 left-auto translate-x-0 md:left-1/2 md:right-auto md:-translate-x-1/2 z-[1000] flex items-center gap-1 rounded-full bg-white shadow-lg border border-gray-200 px-2 py-1 max-w-[calc(100vw-6rem)] md:max-w-none">
             <span className="text-sm pl-1">🏗️</span>
             <input
               type="text"
               value={zoneQuery}
               onChange={e => setZoneQuery(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && searchZones()}
-              placeholder="정비사업 검색 (예: 문래동4가, 신길뉴타운)"
-              className="w-56 text-sm outline-none px-1 py-0.5"
+              placeholder="정비사업 검색 (예: 문래동4가)"
+              className="w-36 sm:w-56 text-sm outline-none px-1 py-0.5 min-w-0"
             />
             {redevZones.length > 0 && (
               <button onClick={() => { setZoneQuery(''); setRedevZones([]) }}
@@ -163,7 +181,7 @@ export default function App() {
             </button>
           </div>
           {redevZones.length > 0 && (
-            <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[1000] rounded-full bg-purple-50 border border-purple-200 text-purple-700 text-xs px-3 py-1 shadow">
+            <div className="absolute top-16 right-3 left-auto translate-x-0 md:top-14 md:left-1/2 md:right-auto md:-translate-x-1/2 z-[1000] rounded-full bg-purple-50 border border-purple-200 text-purple-700 text-xs px-3 py-1 shadow whitespace-nowrap">
               정비사업 {redevZones.length}곳 표시 중
             </div>
           )}
@@ -177,39 +195,39 @@ export default function App() {
             />
           )}
 
-          {/* 좌하단 액션 버튼 — 한 줄로 묶음 */}
-          <div className="absolute bottom-4 left-4 z-[1000] flex flex-wrap items-center gap-2">
+          {/* 좌하단 액션 버튼 — 한 줄로 묶음 (모바일은 짧은 라벨) */}
+          <div className="absolute bottom-4 left-3 md:left-4 z-[1000] flex flex-wrap items-center gap-2 max-w-[62vw] md:max-w-none">
             <button
               onClick={() => mapBounds && setSearchBounds({ ...mapBounds })}
-              className="flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors"
+              className="flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 px-3 py-2 text-xs sm:text-sm sm:px-4 font-semibold text-white shadow-lg transition-colors"
               title="현재 보이는 화면의 단지를 목록에 표시"
             >
-              🔍 현재 화면 검색
+              🔍 <span className="md:hidden">검색</span><span className="hidden md:inline">현재 화면 검색</span>
             </button>
             <button
               onClick={() => setAiFilterOpen(true)}
-              className="flex items-center gap-1.5 rounded-full bg-purple-600 hover:bg-purple-700 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors"
+              className="flex items-center gap-1.5 rounded-full bg-purple-600 hover:bg-purple-700 px-3 py-2 text-xs sm:text-sm sm:px-4 font-semibold text-white shadow-lg transition-colors"
             >
-              🤖 종합 AI 분석
+              🤖 <span className="md:hidden">AI분석</span><span className="hidden md:inline">종합 AI 분석</span>
             </button>
             <button
               onClick={() => setCompareOpen(true)}
-              className="flex items-center gap-1.5 rounded-full bg-indigo-600 hover:bg-indigo-700 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors"
+              className="flex items-center gap-1.5 rounded-full bg-indigo-600 hover:bg-indigo-700 px-3 py-2 text-xs sm:text-sm sm:px-4 font-semibold text-white shadow-lg transition-colors"
             >
-              ⚖️ 단지·지역 비교
+              ⚖️ <span className="md:hidden">비교</span><span className="hidden md:inline">단지·지역 비교</span>
             </button>
             {/* 호재 검색 — 단지 선택 시만 활성 */}
             <button
               onClick={() => selectedProperty && setHojaeOpen(true)}
               disabled={!selectedProperty}
               title={selectedProperty ? '선택한 단지의 호재 검색' : '먼저 단지를 선택하세요'}
-              className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors ${
+              className={`flex items-center gap-1.5 rounded-full px-3 py-2 text-xs sm:text-sm sm:px-4 font-semibold text-white shadow-lg transition-colors ${
                 selectedProperty
                   ? 'bg-emerald-600 hover:bg-emerald-700'
                   : 'bg-emerald-600/40 cursor-not-allowed'
               }`}
             >
-              📰 호재 검색
+              📰 <span className="md:hidden">호재</span><span className="hidden md:inline">호재 검색</span>
             </button>
           </div>
 
@@ -499,7 +517,7 @@ function MapInfoCard({ property: p, onClose, onDetail }) {
   const age = new Date().getFullYear() - p.built_year
 
   return (
-    <div className="absolute left-3 top-3 z-[1000] w-72 rounded-2xl bg-white shadow-2xl border border-gray-100 overflow-hidden">
+    <div className="absolute left-3 top-16 md:top-3 z-[1100] w-72 max-w-[calc(100vw-1.5rem)] rounded-2xl bg-white shadow-2xl border border-gray-100 overflow-hidden">
       {/* 헤더 */}
       <div className="flex items-start justify-between gap-2 px-4 pt-4 pb-2">
         <div className="min-w-0">

@@ -97,7 +97,7 @@ function RangeRow({ label, min, max, value, onChange, unit, step = 1 }) {
   )
 }
 
-export default function FilterPanel({ filters, onChange, total, loading, onGuSelect, showAllZones, onToggleAllZones, zoneCount = 0 }) {
+export default function FilterPanel({ filters, onChange, total, loading, onGuSelect, showAllZones, onToggleAllZones, zoneCount = 0, open = false, onClose }) {
   const [stationInput, setStationInput] = useState(filters.subwayStation || '')
   const [aptNameInput, setAptNameInput] = useState(filters.aptName || '')
   const [dongList, setDongList] = useState([])
@@ -135,13 +135,28 @@ export default function FilterPanel({ filters, onChange, total, loading, onGuSel
   }, [selectedCodes.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <aside className="flex h-full w-72 shrink-0 flex-col border-r border-gray-200 bg-white">
+    <aside
+      className={`flex h-full w-72 max-w-[85vw] shrink-0 flex-col border-r border-gray-200 bg-white
+        fixed inset-y-0 left-0 z-[2500] transform transition-transform duration-200 will-change-transform
+        md:static md:z-auto md:translate-x-0 md:transform-none
+        ${open ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'}`}
+    >
       {/* 헤더 */}
-      <div className="border-b border-gray-200 px-5 py-4">
-        <h1 className="text-lg font-bold text-gray-900">🏙️ 서울 부동산</h1>
-        <p className="text-xs text-gray-500 mt-0.5">
-          {loading ? '검색 중...' : `총 ${total}개 매물`}
-        </p>
+      <div className="border-b border-gray-200 px-5 py-4 flex items-start justify-between">
+        <div>
+          <h1 className="text-lg font-bold text-gray-900">🏙️ 서울 부동산</h1>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {loading ? '검색 중...' : `총 ${total}개 매물`}
+          </p>
+        </div>
+        {/* 모바일 닫기 */}
+        <button
+          onClick={onClose}
+          className="md:hidden -mr-1 -mt-1 rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+          aria-label="필터 닫기"
+        >
+          ✕
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">

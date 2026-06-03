@@ -1,0 +1,22 @@
+name: Keep Render backend warm
+
+# Render 무료 플랜은 15분 미접속 시 잠듦 → 첫 방문 ~50초 지연.
+# 10분마다 백엔드를 깨워 콜드스타트를 방지한다.
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # 10분마다 (GitHub 지연 감안해 15분보다 짧게)
+  workflow_dispatch:           # 수동 실행 버튼
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping backend health
+        run: |
+          for i in 1 2 3; do
+            code=$(curl -s -m 60 -o /dev/null -w "%{http_code}" https://seoul-realestate-api.onrender.com/api/properties || echo "000")
+            echo "attempt $i -> HTTP $code"
+            if [ "$code" = "200" ]; then exit 0; fi
+            sleep 20
+          done
+          echo "backend did not return 200 (cold start may still be waking)"
