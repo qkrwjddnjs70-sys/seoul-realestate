@@ -59,6 +59,14 @@ const SCHOOL_STYLE = {
   '고': { color: '#ea580c', label: '고' },
 }
 
+// 노후도 → 색 (빨강=노후 후보 / 초록=신축)
+function nohuColor(r) {
+  if (r >= 70) return '#dc2626'
+  if (r >= 60) return '#ea580c'
+  if (r >= 45) return '#ca8a04'
+  return '#16a34a'
+}
+
 const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], selectedId, onMarkerClick, onBoundsChange }, ref) {
   const mapRef = useRef(null)
   const mapInstance = useRef(null)
@@ -67,8 +75,11 @@ const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], sel
   const subwayLayerRef = useRef(null)
   const schoolLayerRef = useRef(null)
   const schoolDataRef = useRef(null)
+  const nohuLayerRef = useRef(null)
+  const nohuDataRef = useRef(null)
   const [showSubway, setShowSubway] = useState(false)
   const [showSchool, setShowSchool] = useState(false)
+  const [showNohu, setShowNohu] = useState(false)
 
   // 부모에서 flyTo / fitTo 호출 가능하도록 노출
   useImperativeHandle(ref, () => ({
@@ -275,6 +286,57 @@ const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], sel
     }
   }, [showSchool])
 
+  // 노후도 / 재개발 예측 레이어 (동별 원)
+  useEffect(() => {
+    if (!mapInstance.current) return
+    nohuLayerRef.current?.remove()
+    nohuLayerRef.current = null
+    if (!showNohu) return
+
+    const render = (dongs) => {
+      const group = L.layerGroup()
+      dongs.forEach(d => {
+        if (!d.lat || !d.lng) return
+        const color = nohuColor(d.nohu)
+        const radius = Math.min(38, 10 + Math.sqrt(d.buildings))   // 건물 수 ∝ 크기
+        const isCand = d.verdict === '후보'
+        const circle = L.circleMarker([d.lat, d.lng], {
+          radius, color: '#fff', weight: isCand ? 3 : 1.5,
+          fillColor: color, fillOpacity: 0.55,
+        })
+        circle.bindTooltip(
+          `<div style="text-align:center;font-weight:700;font-size:11px;color:#111">${d.dong}<br/>${d.nohu}%</div>`,
+          { permanent: true, direction: 'center', className: 'nohu-label' })
+        const badge = isCand
+          ? `<span style="color:#dc2626;font-weight:800">🎯 재개발 후보 (미지정)</span>`
+          : d.verdict === '진행중'
+            ? `<span style="color:#7c3aed;font-weight:700">정비구역 진행/지정</span>`
+            : d.verdict === '경계'
+              ? `<span style="color:#ca8a04;font-weight:700">경계</span>`
+              : `<span style="color:#16a34a;font-weight:700">신축 위주</span>`
+        circle.bindPopup(
+          `<div style="font-size:12px;line-height:1.7">
+             <b>${d.dong}</b> · ${d.kind}<br/>
+             노후도 <b style="color:${color}">${d.nohu}%</b> (건물 ${d.buildings.toLocaleString()}채 중 ${d.old.toLocaleString()}채 노후)<br/>
+             평균 연식 <b>${d.avg_age}년</b><br/>
+             ${badge}
+           </div>`)
+        circle.addTo(group)
+      })
+      group.addTo(mapInstance.current)
+      nohuLayerRef.current = group
+    }
+
+    if (nohuDataRef.current) {
+      render(nohuDataRef.current)
+    } else {
+      fetch('/api/redev-predict')
+        .then(r => r.json())
+        .then(d => { nohuDataRef.current = d.dongs ?? []; if (showNohu) render(nohuDataRef.current) })
+        .catch(() => {})
+    }
+  }, [showNohu])
+
   return (
     <div className="relative h-full w-full">
       <div ref={mapRef} className="h-full w-full" />
@@ -300,6 +362,16 @@ const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], sel
           }`}
         >
           🏫 학교 {showSchool ? 'ON' : 'OFF'}
+        </button>
+        <button
+          onClick={() => setShowNohu(v => !v)}
+          className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold shadow transition-all border ${
+            showNohu
+              ? 'bg-rose-600 text-white border-rose-600'
+              : 'bg-white text-gray-600 border-gray-200 hover:border-rose-300'
+          }`}
+        >
+          🏚️ 노후도 {showNohu ? 'ON' : 'OFF'}
         </button>
       </div>
 
@@ -334,6 +406,26 @@ const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], sel
               <span className="text-gray-700">{label}</span>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* 노후도 범례 */}
+      {showNohu && (
+        <div className="absolute right-3 z-[1000] rounded-xl border border-gray-200 bg-white/95 px-3 py-2 text-xs shadow backdrop-blur-sm"
+             style={{ top: showSubway ? '20rem' : (showSchool ? '12rem' : '6rem') }}>
+          <p className="mb-1.5 font-semibold text-gray-600">🏚️ 노후도 (동별)</p>
+          {[
+            { color: '#dc2626', label: '70%+ 매우노후' },
+            { color: '#ea580c', label: '60~70% 후보권' },
+            { color: '#ca8a04', label: '45~60% 경계' },
+            { color: '#16a34a', label: '~45% 신축' },
+          ].map(({ color, label }) => (
+            <div key={label} className="flex items-center gap-1.5 mb-0.5 last:mb-0">
+              <span style={{ background: color }} className="inline-block h-2.5 w-2.5 rounded-full" />
+              <span className="text-gray-700">{label}</span>
+            </div>
+          ))}
+          <p className="mt-1.5 pt-1.5 border-t border-gray-100 text-[11px] text-gray-400">흰 굵은테 = 미지정 후보 🎯</p>
         </div>
       )}
 
