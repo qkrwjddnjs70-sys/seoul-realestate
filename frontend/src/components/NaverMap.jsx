@@ -295,19 +295,27 @@ const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], sel
 
     const render = (dongs) => {
       const group = L.layerGroup()
+      // 점수 상위 30개 후보만 상시 라벨 (도시뷰 혼잡·부하 방지)
+      const topNames = new Set(
+        dongs.filter(x => x.verdict === '후보')
+             .sort((a, b) => (b.score || 0) - (a.score || 0))
+             .slice(0, 30).map(x => x.dong + x.gu))
       dongs.forEach(d => {
         if (!d.lat || !d.lng) return
         const color = nohuColor(d.nohu)
         const radius = Math.min(38, 10 + Math.sqrt(d.buildings))   // 건물 수 ∝ 크기
         const isCand = d.verdict === '후보'
+        const labelOn = topNames.has(d.dong + d.gu)
         const circle = L.circleMarker([d.lat, d.lng], {
           radius, color: '#fff', weight: isCand ? 3 : 1.5,
           fillColor: color, fillOpacity: 0.55,
         })
-        // 후보 동만 상시 라벨(도시 전체뷰 혼잡 방지), 나머지는 hover
+        const gradeColor = { S: '#b91c1c', A: '#dc2626', B: '#ea580c', C: '#ca8a04', D: '#16a34a' }[d.grade] || '#888'
+        // 후보 동만 상시 라벨(등급+동명), 나머지는 hover
         circle.bindTooltip(
-          `<div style="text-align:center;font-weight:700;font-size:11px;color:#111">${d.dong}<br/>${d.nohu}%</div>`,
-          { permanent: d.verdict === '후보', direction: 'center', className: 'nohu-label' })
+          `<div style="text-align:center;font-weight:700;font-size:11px;color:#111">
+             ${d.grade ? `<span style="color:${gradeColor}">${d.grade}</span> ` : ''}${d.dong}<br/>${d.nohu}%</div>`,
+          { permanent: labelOn, direction: 'center', className: 'nohu-label' })
         const badge = isCand
           ? `<span style="color:#dc2626;font-weight:800">🎯 재개발 후보 (미지정)</span>`
           : d.verdict === '진행중'
@@ -316,10 +324,15 @@ const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], sel
               ? `<span style="color:#ca8a04;font-weight:700">경계</span>`
               : `<span style="color:#16a34a;font-weight:700">신축 위주</span>`
         circle.bindPopup(
-          `<div style="font-size:12px;line-height:1.7">
-             <b>${d.dong}</b> · ${d.kind}<br/>
-             노후도 <b style="color:${color}">${d.nohu}%</b> (건물 ${d.buildings.toLocaleString()}채 중 ${d.old.toLocaleString()}채 노후)<br/>
-             평균 연식 <b>${d.avg_age}년</b><br/>
+          `<div style="font-size:12px;line-height:1.7;min-width:170px">
+             <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+               <span style="background:${gradeColor};color:#fff;font-weight:800;font-size:13px;padding:1px 8px;border-radius:6px">${d.grade || '-'}</span>
+               <b style="font-size:13px">${d.dong}</b>
+               <span style="color:#666;font-size:11px">${d.subtype || d.kind}</span>
+             </div>
+             종합 후보점수 <b style="color:${gradeColor}">${d.score ?? '-'}</b> / 100<br/>
+             노후도 <b style="color:${color}">${d.nohu}%</b> · 평균 <b>${d.avg_age}년</b><br/>
+             <span style="color:#999;font-size:11px">건물 ${d.buildings.toLocaleString()}채 중 ${d.old.toLocaleString()}채 노후</span><br/>
              ${badge}
            </div>`)
         circle.addTo(group)
