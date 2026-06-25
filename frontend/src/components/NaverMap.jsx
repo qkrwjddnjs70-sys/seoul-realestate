@@ -304,9 +304,10 @@ const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], sel
           radius, color: '#fff', weight: isCand ? 3 : 1.5,
           fillColor: color, fillOpacity: 0.55,
         })
+        // 후보 동만 상시 라벨(도시 전체뷰 혼잡 방지), 나머지는 hover
         circle.bindTooltip(
           `<div style="text-align:center;font-weight:700;font-size:11px;color:#111">${d.dong}<br/>${d.nohu}%</div>`,
-          { permanent: true, direction: 'center', className: 'nohu-label' })
+          { permanent: d.verdict === '후보', direction: 'center', className: 'nohu-label' })
         const badge = isCand
           ? `<span style="color:#dc2626;font-weight:800">🎯 재개발 후보 (미지정)</span>`
           : d.verdict === '진행중'
