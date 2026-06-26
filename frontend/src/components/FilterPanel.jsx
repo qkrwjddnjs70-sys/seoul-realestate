@@ -97,7 +97,7 @@ function RangeRow({ label, min, max, value, onChange, unit, step = 1 }) {
   )
 }
 
-export default function FilterPanel({ filters, onChange, total, loading, onGuSelect, showAllZones, onToggleAllZones, zoneCount = 0, open = false, onClose }) {
+export default function FilterPanel({ filters, onChange, total, loading, onGuSelect, showAllZones, onToggleAllZones, zoneCount = 0, nohu = { on: false, onlyCand: false, grades: [], subtypes: [] }, onNohuChange, open = false, onClose }) {
   const [stationInput, setStationInput] = useState(filters.subwayStation || '')
   const [aptNameInput, setAptNameInput] = useState(filters.aptName || '')
   const [dongList, setDongList] = useState([])
@@ -377,6 +377,71 @@ export default function FilterPanel({ filters, onChange, total, loading, onGuSel
           </button>
           {showAllZones && (
             <p className="mt-1 text-[11px] text-purple-500">지도에 정비사업이 🏗️ 마커로 표시됩니다 (클릭 시 단계·세대수)</p>
+          )}
+        </section>
+
+        <hr className="border-gray-100" />
+
+        {/* 노후도 · 재개발 예측 */}
+        <section>
+          <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-gray-800">
+            🏚️ 노후도 · 재개발 예측
+          </h2>
+          <button
+            onClick={() => onNohuChange?.({ ...nohu, on: !nohu.on })}
+            className={`w-full flex items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold border transition-colors ${
+              nohu.on ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-gray-600 border-gray-200 hover:border-rose-300'
+            }`}
+          >
+            <span>🏚️ 동별 노후도 지도표시</span>
+            <span className={nohu.on ? 'text-rose-100' : 'text-rose-400'}>{nohu.on ? 'ON' : 'OFF'}</span>
+          </button>
+
+          {nohu.on && (
+            <div className="mt-2.5 space-y-2.5">
+              <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+                <input type="checkbox" checked={!!nohu.onlyCand}
+                  onChange={() => onNohuChange?.({ ...nohu, onlyCand: !nohu.onlyCand })}
+                  className="accent-rose-600" />
+                🎯 미지정 재개발 후보만 보기
+              </label>
+
+              <div>
+                <p className="mb-1 text-[11px] font-medium text-gray-500">등급 (종합 후보점수)</p>
+                <div className="flex flex-wrap gap-1">
+                  {['S', 'A', 'B', 'C'].map(g => {
+                    const on = nohu.grades?.includes(g)
+                    return (
+                      <button key={g}
+                        onClick={() => onNohuChange?.({ ...nohu, grades: on ? nohu.grades.filter(x => x !== g) : [...(nohu.grades || []), g] })}
+                        className={`px-2.5 py-1 rounded-md text-xs font-bold border ${
+                          on ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-gray-500 border-gray-200'
+                        }`}>{g}</button>
+                    )
+                  })}
+                  <span className="self-center text-[10px] text-gray-400 ml-1">미선택=전체</span>
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-1 text-[11px] font-medium text-gray-500">유형</p>
+                <div className="flex flex-wrap gap-1">
+                  {['주거재개발', '준공업재개발', '재건축(아파트)', '도심상업', '혼합주거'].map(s => {
+                    const on = nohu.subtypes?.includes(s)
+                    return (
+                      <button key={s}
+                        onClick={() => onNohuChange?.({ ...nohu, subtypes: on ? nohu.subtypes.filter(x => x !== s) : [...(nohu.subtypes || []), s] })}
+                        className={`px-2 py-1 rounded-md text-[11px] border ${
+                          on ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-gray-500 border-gray-200'
+                        }`}>{s}</button>
+                    )
+                  })}
+                </div>
+              </div>
+              <p className="text-[11px] text-rose-400 leading-snug">
+                빨강=노후(70%+) · 흰 굵은테=미지정 후보 🎯 · 클릭 시 점수·등급·유형
+              </p>
+            </div>
           )}
         </section>
 

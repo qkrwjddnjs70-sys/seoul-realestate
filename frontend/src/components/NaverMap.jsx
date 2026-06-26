@@ -67,7 +67,7 @@ function nohuColor(r) {
   return '#16a34a'
 }
 
-const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], selectedId, onMarkerClick, onBoundsChange }, ref) {
+const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], selectedId, onMarkerClick, onBoundsChange, nohu = { on: false }, onNohuToggle }, ref) {
   const mapRef = useRef(null)
   const mapInstance = useRef(null)
   const markersRef = useRef([])   // [{marker, id}]
@@ -79,7 +79,7 @@ const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], sel
   const nohuDataRef = useRef(null)
   const [showSubway, setShowSubway] = useState(false)
   const [showSchool, setShowSchool] = useState(false)
-  const [showNohu, setShowNohu] = useState(false)
+  const showNohu = nohu.on   // 상태는 부모(App)에서 관리
 
   // 부모에서 flyTo / fitTo 호출 가능하도록 노출
   useImperativeHandle(ref, () => ({
@@ -293,7 +293,14 @@ const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], sel
     nohuLayerRef.current = null
     if (!showNohu) return
 
-    const render = (dongs) => {
+    const render = (all) => {
+      // 좌측 필터 적용
+      const dongs = all.filter(d => {
+        if (nohu.onlyCand && d.verdict !== '후보') return false
+        if (nohu.grades?.length && !nohu.grades.includes(d.grade)) return false
+        if (nohu.subtypes?.length && !nohu.subtypes.includes(d.subtype)) return false
+        return true
+      })
       const group = L.layerGroup()
       // 점수 상위 30개 후보만 상시 라벨 (도시뷰 혼잡·부하 방지)
       const topNames = new Set(
@@ -349,7 +356,7 @@ const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], sel
         .then(d => { nohuDataRef.current = d.dongs ?? []; if (showNohu) render(nohuDataRef.current) })
         .catch(() => {})
     }
-  }, [showNohu])
+  }, [showNohu, nohu.onlyCand, nohu.grades, nohu.subtypes])
 
   return (
     <div className="relative h-full w-full">
@@ -378,7 +385,7 @@ const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], sel
           🏫 학교 {showSchool ? 'ON' : 'OFF'}
         </button>
         <button
-          onClick={() => setShowNohu(v => !v)}
+          onClick={() => onNohuToggle?.()}
           className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold shadow transition-all border ${
             showNohu
               ? 'bg-rose-600 text-white border-rose-600'

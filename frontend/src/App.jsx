@@ -26,6 +26,7 @@ export default function App() {
   const [zoneQuery, setZoneQuery] = useState('')
   const [redevZones, setRedevZones] = useState([])
   const [showAllZones, setShowAllZones] = useState(false)
+  const [nohu, setNohu] = useState({ on: false, onlyCand: false, grades: [], subtypes: [] })
 
   // "정비사업 보기" 토글 → 선택 구가 있으면 그 구만, 없으면 서울 전체
   useEffect(() => {
@@ -136,6 +137,8 @@ export default function App() {
         showAllZones={showAllZones}
         onToggleAllZones={toggleAllZones}
         zoneCount={redevZones.length}
+        nohu={nohu}
+        onNohuChange={setNohu}
         open={filterOpen}
         onClose={() => setFilterOpen(false)}
       />
@@ -150,6 +153,8 @@ export default function App() {
             selectedId={selectedProperty?.id ?? null}
             onMarkerClick={handleMarkerClick}
             onBoundsChange={handleBoundsChange}
+            nohu={nohu}
+            onNohuToggle={() => setNohu(n => ({ ...n, on: !n.on }))}
           />
 
           {/* 모바일 전용 필터 열기 버튼 */}
