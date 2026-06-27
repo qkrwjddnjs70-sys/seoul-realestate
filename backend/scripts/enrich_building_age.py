@@ -71,8 +71,14 @@ def fetch_dong(sgg, bjd):
             items += it
     return name, (items, total)
 
+def _f(v):
+    try: return float(v)
+    except (TypeError, ValueError): return 0.0
+
 def analyze(items):
     n = old = 0; ages = []; purpose = {}
+    floors = []; low = 0           # 지상층수 / 저층(≤4층) 수
+    sum_tot = sum_plat = 0.0       # 연면적·대지면적 합(추정 용적률용)
     for it in items:
         d = (it.get("useAprDay") or "").strip()
         if len(d) < 4 or not d[:4].isdigit(): continue
@@ -84,6 +90,13 @@ def analyze(items):
         thr = 30 if ("철근" in struct or "철골" in struct or "라멘" in struct) else 20
         n += 1; ages.append(age)
         if age >= thr: old += 1
+        fl = _f(it.get("grndFlrCnt"))
+        if fl > 0:
+            floors.append(fl)
+            if fl <= 4: low += 1
+        tot = _f(it.get("totArea")); plat = _f(it.get("platArea"))
+        if tot > 0 and plat > 0:
+            sum_tot += tot; sum_plat += plat
         if "단독" in purp: k = "단독주택"
         elif "공동" in purp or "아파트" in purp or "다세대" in purp or "연립" in purp: k = "공동주택"
         elif "근린" in purp: k = "근린생활"
@@ -93,7 +106,10 @@ def analyze(items):
         purpose[k] = purpose.get(k, 0) + 1
     ratio = round(old / n * 100, 1) if n else 0
     avg = round(sum(ages) / len(ages), 1) if ages else 0
-    return n, old, ratio, avg, purpose
+    avg_floor = round(sum(floors) / len(floors), 1) if floors else 0
+    lowrise = round(low / len(floors) * 100, 1) if floors else 0   # 저층 비율(%)
+    est_far = round(sum_tot / sum_plat * 100, 0) if sum_plat > 0 else None  # 추정 현재 용적률
+    return n, old, ratio, avg, purpose, avg_floor, lowrise, est_far
 
 def geocode(gu, name):
     try:
@@ -122,7 +138,7 @@ def main():
             name, res = fetch_dong(sgg, bjd)
             if not name: continue
             items, total = res
-            n, old, ratio, avg, purpose = analyze(items)
+            n, old, ratio, avg, purpose, avg_floor, lowrise, est_far = analyze(items)
             if n < 10: continue
             lat, lng = geocode(guname, name)
             kind = "재건축" if purpose.get("공동주택", 0) > n * 0.5 else "재개발"
@@ -130,6 +146,7 @@ def main():
             verdict = "후보" if (ratio >= 60 and not already) else ("진행중" if already else ("경계" if ratio >= 45 else "신축위주"))
             results.append({"gu": guname, "dong": name, "bjdongCd": bjd,
                 "buildings": total, "sampled": n, "old": old, "nohu": ratio, "avg_age": avg,
+                "avg_floor": avg_floor, "lowrise": lowrise, "est_far": est_far,
                 "kind": kind, "already_zone": already, "verdict": verdict,
                 "purpose": purpose, "lat": lat, "lng": lng})
             gucount += 1

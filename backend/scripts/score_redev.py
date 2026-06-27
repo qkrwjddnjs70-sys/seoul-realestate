@@ -22,7 +22,12 @@ for d in data["dongs"]:
     lowres = (p.get("단독주택", 0) + p.get("근린생활", 0) + p.get("공장", 0)) / tot
     age_n = min(d.get("avg_age", 0) / 45, 1) * 100
     use_fit = (apt if d.get("kind") == "재건축" else lowres) * 100
-    base = 0.50 * d.get("nohu", 0) + 0.20 * age_n + 0.15 * use_fit
+    # 사업성 여력: 저층비율(낮은 층=용적률 여력 큼). 추정용적률 높으면(이미 밀집) 감점
+    biz_room = d.get("lowrise", 0)
+    far = d.get("est_far")
+    if far is not None and far > 250:
+        biz_room *= max(0.5, 1 - (far - 250) / 500)   # 용적률 높을수록 여력 감소
+    base = 0.42 * d.get("nohu", 0) + 0.20 * biz_room + 0.13 * age_n + 0.10 * use_fit
     bonus = 15 if not d.get("already_zone") else 5  # 미지정(예측가치)에 가산
     score = round(min(base + bonus, 100), 1)
     d["score"] = score

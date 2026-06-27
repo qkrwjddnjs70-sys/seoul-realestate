@@ -339,6 +339,7 @@ const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], sel
              </div>
              종합 후보점수 <b style="color:${gradeColor}">${d.score ?? '-'}</b> / 100<br/>
              노후도 <b style="color:${color}">${d.nohu}%</b> · 평균 <b>${d.avg_age}년</b><br/>
+             ${d.lowrise != null ? `사업성 여력: 저층(≤4층) <b>${d.lowrise}%</b> · 평균 <b>${d.avg_floor}층</b>${d.est_far != null ? ` · 추정용적률 <b>${d.est_far}%</b>` : ''}<br/>` : ''}
              <span style="color:#999;font-size:11px">건물 ${d.buildings.toLocaleString()}채 중 ${d.old.toLocaleString()}채 노후</span><br/>
              ${badge}
            </div>`)
