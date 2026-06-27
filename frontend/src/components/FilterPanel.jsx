@@ -403,11 +403,11 @@ export default function FilterPanel({ filters, onChange, total, loading, onGuSel
                 <input type="checkbox" checked={!!nohu.onlyCand}
                   onChange={() => onNohuChange?.({ ...nohu, onlyCand: !nohu.onlyCand })}
                   className="accent-rose-600" />
-                🔴 노후도 60%+ (노후·심각)만 보기
+                🎯 미지정 재개발 후보만 보기
               </label>
 
               <div>
-                <p className="mb-1 text-[11px] font-medium text-gray-500">등급 (노후·사업성 점수)</p>
+                <p className="mb-1 text-[11px] font-medium text-gray-500">등급 (종합 후보점수)</p>
                 <div className="flex flex-wrap gap-1">
                   {['S', 'A', 'B', 'C'].map(g => {
                     const on = nohu.grades?.includes(g)
@@ -439,7 +439,7 @@ export default function FilterPanel({ filters, onChange, total, loading, onGuSel
                 </div>
               </div>
               <p className="text-[11px] text-rose-400 leading-snug">
-                빨강=노후(70%+) · 굵은테=노후심각 · 점수=노후·사업성(정비 진행여부는 별도 확인)
+                빨강=노후(70%+) · 흰 굵은테=미지정 후보 🎯 · 클릭 시 점수·등급·유형
               </p>
             </div>
           )}
