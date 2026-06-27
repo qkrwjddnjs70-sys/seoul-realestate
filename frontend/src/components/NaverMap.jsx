@@ -295,41 +295,39 @@ const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], sel
 
     const render = (all) => {
       // 좌측 필터 적용
+      const HOT = d => d.verdict === '노후심각' || d.verdict === '노후'   // 노후도 60%+
       const dongs = all.filter(d => {
-        if (nohu.onlyCand && d.verdict !== '후보') return false
+        if (nohu.onlyCand && !HOT(d)) return false   // '노후도 60%+만'
         if (nohu.grades?.length && !nohu.grades.includes(d.grade)) return false
         if (nohu.subtypes?.length && !nohu.subtypes.includes(d.subtype)) return false
         return true
       })
       const group = L.layerGroup()
-      // 점수 상위 30개 후보만 상시 라벨 (도시뷰 혼잡·부하 방지)
+      // 점수 상위 30개만 상시 라벨 (도시뷰 혼잡·부하 방지)
       const topNames = new Set(
-        dongs.filter(x => x.verdict === '후보')
-             .sort((a, b) => (b.score || 0) - (a.score || 0))
+        [...dongs].sort((a, b) => (b.score || 0) - (a.score || 0))
              .slice(0, 30).map(x => x.dong + x.gu))
       dongs.forEach(d => {
         if (!d.lat || !d.lng) return
         const color = nohuColor(d.nohu)
         const radius = Math.min(38, 10 + Math.sqrt(d.buildings))   // 건물 수 ∝ 크기
-        const isCand = d.verdict === '후보'
+        const isHot = d.verdict === '노후심각'
         const labelOn = topNames.has(d.dong + d.gu)
         const circle = L.circleMarker([d.lat, d.lng], {
-          radius, color: '#fff', weight: isCand ? 3 : 1.5,
+          radius, color: '#fff', weight: isHot ? 3 : 1.5,
           fillColor: color, fillOpacity: 0.55,
         })
         const gradeColor = { S: '#b91c1c', A: '#dc2626', B: '#ea580c', C: '#ca8a04', D: '#16a34a' }[d.grade] || '#888'
-        // 후보 동만 상시 라벨(등급+동명), 나머지는 hover
+        // 상위 30 동만 상시 라벨(등급+동명), 나머지는 hover
         circle.bindTooltip(
           `<div style="text-align:center;font-weight:700;font-size:11px;color:#111">
              ${d.grade ? `<span style="color:${gradeColor}">${d.grade}</span> ` : ''}${d.dong}<br/>${d.nohu}%</div>`,
           { permanent: labelOn, direction: 'center', className: 'nohu-label' })
-        const badge = isCand
-          ? `<span style="color:#dc2626;font-weight:800">🎯 재개발 후보 (미지정)</span>`
-          : d.verdict === '진행중'
-            ? `<span style="color:#7c3aed;font-weight:700">정비구역 진행/지정</span>`
-            : d.verdict === '경계'
-              ? `<span style="color:#ca8a04;font-weight:700">경계</span>`
-              : `<span style="color:#16a34a;font-weight:700">신축 위주</span>`
+        const zoneNote = d.already_zone
+          ? `<span style="color:#7c3aed;font-weight:700">정비구역(우리DB 등재)</span>`
+          : `<span style="color:#999;font-weight:600">정비 진행여부 미확인 — 정보몽땅 확인</span>`
+        const vColor = { '노후심각':'#dc2626','노후':'#ea580c','경계':'#ca8a04','신축위주':'#16a34a' }[d.verdict] || '#888'
+        const badge = `<span style="color:${vColor};font-weight:800">${d.verdict}</span><br/>${zoneNote}`
         circle.bindPopup(
           `<div style="font-size:12px;line-height:1.7;min-width:170px">
              <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
@@ -337,7 +335,7 @@ const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], sel
                <b style="font-size:13px">${d.dong}</b>
                <span style="color:#666;font-size:11px">${d.subtype || d.kind}</span>
              </div>
-             종합 후보점수 <b style="color:${gradeColor}">${d.score ?? '-'}</b> / 100<br/>
+             노후·사업성 점수 <b style="color:${gradeColor}">${d.score ?? '-'}</b> / 100<br/>
              노후도 <b style="color:${color}">${d.nohu}%</b> · 평균 <b>${d.avg_age}년</b><br/>
              ${d.lowrise != null ? `사업성 여력: 저층(≤4층) <b>${d.lowrise}%</b> · 평균 <b>${d.avg_floor}층</b>${d.est_far != null ? ` · 추정용적률 <b>${d.est_far}%</b>` : ''}<br/>` : ''}
              <span style="color:#999;font-size:11px">건물 ${d.buildings.toLocaleString()}채 중 ${d.old.toLocaleString()}채 노후</span><br/>

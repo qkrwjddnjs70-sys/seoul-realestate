@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
-"""building_age.json에 종합 재개발 후보점수 추가 (API 재호출 없이 재계산).
-점수(0~100) = 노후도(50%) + 평균연식(20%) + 용도적합도(15%) + 미지정가산(15%)
+"""building_age.json에 노후·사업성 종합점수 추가 (API 재호출 없이 재계산).
+점수(0~100) = 노후도(50%) + 사업성여력·저층(25%) + 평균연식(15%) + 용도적합도(10%)
+  - 사업성여력: 저층비율(낮은 층=용적률 여력) / 추정용적률 높으면 감점
   - 용도적합도: 재건축(아파트밀집)=공동주택비중 / 재개발=저층(단독·근린·공장)비중
+  ※ '미지정 가산' 제거: already_zone(우리 DB) 불완전 → 미지정 판정 부정확하므로 점수에서 배제.
+    점수는 순수 '노후·사업성'이며, 실제 정비 진행여부는 정보몽땅에서 별도 확인할 것.
 등급: S≥80, A 70+, B 60+, C 50+, D<50
 """
 import sys, json
@@ -27,9 +30,8 @@ for d in data["dongs"]:
     far = d.get("est_far")
     if far is not None and far > 250:
         biz_room *= max(0.5, 1 - (far - 250) / 500)   # 용적률 높을수록 여력 감소
-    base = 0.42 * d.get("nohu", 0) + 0.20 * biz_room + 0.13 * age_n + 0.10 * use_fit
-    bonus = 15 if not d.get("already_zone") else 5  # 미지정(예측가치)에 가산
-    score = round(min(base + bonus, 100), 1)
+    # 미지정 가산 제거 — 순수 노후·사업성만 (합 100%)
+    score = round(min(0.50 * d.get("nohu", 0) + 0.25 * biz_room + 0.15 * age_n + 0.10 * use_fit, 100), 1)
     d["score"] = score
     d["grade"] = grade(score)
     # 유형 분류 (사용자가 주거 재개발 vs 도심상업 구분)
@@ -46,12 +48,16 @@ for d in data["dongs"]:
         d["subtype"] = "도심상업"
     else:
         d["subtype"] = "혼합주거"
+    # verdict 재계산: 순수 노후도 기준 (미지정/진행중 구분 제거 — already_zone 불완전)
+    nv = d.get("nohu", 0)
+    d["verdict"] = "노후심각" if nv >= 70 else "노후" if nv >= 60 else "경계" if nv >= 45 else "신축위주"
 
 fp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
 
-# 미지정 주거형 후보 TOP 15 (도심상업 제외)
-cand = [d for d in data["dongs"] if not d["already_zone"] and d["subtype"] != "도심상업"]
-print("=== 미지정 '주거·준공업' 재개발 후보 TOP 15 (도심상업 제외) ===")
+# 노후·사업성 종합점수 TOP 15 (도심상업 제외)
+cand = [d for d in data["dongs"] if d["subtype"] != "도심상업"]
+print("=== 노후·사업성 종합점수 TOP 15 (도심상업 제외) ===")
 for d in sorted(cand, key=lambda a: -a["score"])[:15]:
-    print(f"  [{d['grade']}] {d['score']:>5}  {d['gu']:<7}{d['dong']:<9} 노후{d['nohu']:>5}% {d['subtype']:<10} 건물{d['buildings']}")
+    zone = "정비구역(DB)" if d.get("already_zone") else "정비여부 미확인"
+    print(f"  [{d['grade']}] {d['score']:>5}  {d['gu']:<7}{d['dong']:<9} 노후{d['nohu']:>5}% {d['subtype']:<10} {zone}")
 print(f"\n총 {len(data['dongs'])}개 동 점수화 완료")
