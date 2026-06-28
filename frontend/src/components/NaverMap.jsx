@@ -67,6 +67,15 @@ function nohuColor(r) {
   return '#16a34a'
 }
 
+// 구명 → 시군구코드 (핀셋 블록정밀용)
+const GU2SGG = {
+  '종로구':'11110','중구':'11140','용산구':'11170','성동구':'11200','광진구':'11215',
+  '동대문구':'11230','중랑구':'11260','성북구':'11290','강북구':'11305','도봉구':'11320',
+  '노원구':'11350','은평구':'11380','서대문구':'11410','마포구':'11440','양천구':'11470',
+  '강서구':'11500','구로구':'11530','금천구':'11545','영등포구':'11560','동작구':'11590',
+  '관악구':'11620','서초구':'11650','강남구':'11680','송파구':'11710','강동구':'11740',
+}
+
 const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], selectedId, onMarkerClick, onBoundsChange, nohu = { on: false }, onNohuToggle }, ref) {
   const mapRef = useRef(null)
   const mapInstance = useRef(null)
@@ -77,6 +86,7 @@ const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], sel
   const schoolDataRef = useRef(null)
   const nohuLayerRef = useRef(null)
   const nohuDataRef = useRef(null)
+  const pinsetLayerRef = useRef(null)
   const [showSubway, setShowSubway] = useState(false)
   const [showSchool, setShowSchool] = useState(false)
   const showNohu = nohu.on || nohu.candOn   // 전체 노후도 OR 미지정후보만 (부모 App 관리)
@@ -348,6 +358,9 @@ const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], sel
                   background:${d.note_flag === '제약' ? '#fef2f2' : d.note_flag === '진행중' ? '#f5f3ff' : '#fffbeb'};
                   color:${d.note_flag === '제약' ? '#b91c1c' : d.note_flag === '진행중' ? '#6d28d9' : '#b45309'};">
                   <b>비고${d.note_flag ? `(${d.note_flag === '제약' ? '🚫 개발제약' : d.note_flag === '진행중' ? '✅ 실제 진행중' : '⚠️ 주의'})` : ''}</b><br/>${d.note}</div>` : ''}
+             ${GU2SGG[d.gu] && d.bjdongCd ? `<button onclick="window.__pinset('${GU2SGG[d.gu]}','${d.bjdongCd}','${d.dong}')"
+                  style="margin-top:6px;width:100%;padding:5px;border:1px solid #dc2626;border-radius:6px;background:#fff;color:#dc2626;font-weight:700;font-size:11px;cursor:pointer;">
+                  🔬 블록 정밀(100m 격자) 보기</button>` : ''}
            </div>`)
         circle.addTo(group)
       })
@@ -364,6 +377,34 @@ const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], sel
         .catch(() => {})
     }
   }, [showNohu, nohu.on, nohu.candOn, nohu.grades, nohu.subtypes])
+
+  // 핀셋(블록 정밀): 팝업 버튼 → window.__pinset 호출 → 100m 격자 사각형 렌더
+  useEffect(() => {
+    const LATH = 0.00045, LNGH = 0.00057   // 격자 절반(~50m)
+    window.__pinset = async (sgg, bjd, dong) => {
+      try {
+        const r = await fetch(`/api/pinset?sgg=${sgg}&bjd=${bjd}`)
+        const j = await r.json()
+        pinsetLayerRef.current?.remove(); pinsetLayerRef.current = null
+        if (!j.ready || !j.cells?.length) { console.warn(`${dong}: 블록 정밀 데이터 준비중 (PoC는 문래동4가만)`); return }
+        const group = L.layerGroup()
+        const bounds = []
+        j.cells.forEach(c => {
+          const b = [[c.lat - LATH, c.lng - LNGH], [c.lat + LATH, c.lng + LNGH]]
+          bounds.push(b[0], b[1])
+          L.rectangle(b, { color: '#fff', weight: 1, fillColor: nohuColor(c.ratio), fillOpacity: 0.6 })
+            .bindTooltip(`${c.ratio}%`, { permanent: true, direction: 'center', className: 'nohu-label' })
+            .bindPopup(`<b>${dong} 블록</b><br/>노후 ${c.ratio}% (${c.old}/${c.total}채)`)
+            .addTo(group)
+        })
+        group.addTo(mapInstance.current)
+        pinsetLayerRef.current = group
+        if (bounds.length) mapInstance.current.flyToBounds(L.latLngBounds(bounds), { padding: [40, 40], maxZoom: 17, duration: 0.8 })
+      } catch (e) { console.warn('블록 정밀 로드 실패', e) }
+    }
+    window.__pinsetClear = () => { pinsetLayerRef.current?.remove(); pinsetLayerRef.current = null }
+    return () => { delete window.__pinset; delete window.__pinsetClear }
+  }, [])
 
   return (
     <div className="relative h-full w-full">
