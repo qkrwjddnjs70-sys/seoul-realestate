@@ -22,11 +22,20 @@ for d in data["dongs"]:
     lowres = (p.get("단독주택", 0) + p.get("근린생활", 0) + p.get("공장", 0)) / tot
     age_n = min(d.get("avg_age", 0) / 45, 1) * 100
     use_fit = (apt if d.get("kind") == "재건축" else lowres) * 100
-    # 사업성 여력: 저층비율(낮은 층=용적률 여력 큼). 추정용적률 높으면(이미 밀집) 감점
-    biz_room = d.get("lowrise", 0)
+    # 사업성·입지 = 저층여력 + 역세권 + 평지 (모두 0~100, 높을수록 좋음)
+    low_s = d.get("lowrise", 0)                                  # 저층비율(용적률 여력)
     far = d.get("est_far")
     if far is not None and far > 250:
-        biz_room *= max(0.5, 1 - (far - 250) / 500)   # 용적률 높을수록 여력 감소
+        low_s *= max(0.5, 1 - (far - 250) / 500)                 # 이미 밀집이면 여력 감소
+    dist = d.get("station_dist")
+    stn_s = max(0, min(1, (1000 - dist) / 700)) * 100 if dist is not None else 50  # 역 300m=만점,1km=0
+    slope = d.get("avg_slope")
+    if slope is not None:
+        slp_s = max(0, min(1, (20 - slope) / 15)) * 100          # 평지(≤5도) 만점, 20도+ 0
+        biz_room = 0.45 * low_s + 0.35 * stn_s + 0.20 * slp_s
+    else:
+        biz_room = 0.55 * low_s + 0.45 * stn_s                   # 경사 없으면 둘로 배분
+    d["biz_room"] = round(biz_room, 1)
     base = 0.42 * d.get("nohu", 0) + 0.20 * biz_room + 0.13 * age_n + 0.10 * use_fit
     bonus = 15 if not d.get("already_zone") else 5  # 미지정(예측가치)에 가산
     score = round(min(base + bonus, 100), 1)

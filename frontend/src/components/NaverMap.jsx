@@ -352,6 +352,7 @@ const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], sel
              종합 후보점수 <b style="color:${gradeColor}">${d.score ?? '-'}</b> / 100<br/>
              노후도 <b style="color:${color}">${d.nohu}%</b> · 평균 <b>${d.avg_age}년</b><br/>
              ${d.lowrise != null ? `사업성 여력: 저층(≤4층) <b>${d.lowrise}%</b> · 평균 <b>${d.avg_floor}층</b>${d.est_far != null ? ` · 추정용적률 <b>${d.est_far}%</b>` : ''}<br/>` : ''}
+             ${d.station_dist != null ? `입지: 역 <b>${d.station_dist}m</b>(도보 ${d.walk_min}분)${d.avg_slope != null ? ` · 경사 <b>${d.avg_slope}°</b>${d.avg_slope <= 5 ? '(평지)' : d.avg_slope >= 15 ? '(급경사)' : ''}` : ''}<br/>` : ''}
              <span style="color:#999;font-size:11px">건물 ${d.buildings.toLocaleString()}채 중 ${d.old.toLocaleString()}채 노후</span><br/>
              ${badge}
              ${d.note ? `<div style="margin-top:5px;padding:5px 7px;border-radius:6px;font-size:11px;line-height:1.5;
@@ -382,9 +383,20 @@ const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], sel
   useEffect(() => {
     const LATH = 0.00045, LNGH = 0.00057   // 격자 절반(~50m)
     window.__pinset = async (sgg, bjd, dong) => {
+      // 로딩 오버레이
+      const el = mapRef.current
+      let load = null
+      if (el) {
+        load = document.createElement('div')
+        load.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:3000;background:rgba(220,38,38,.95);color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;font-weight:700;box-shadow:0 2px 10px rgba(0,0,0,.4)'
+        load.textContent = `🔬 ${dong} 블록 분석 중… (최대 30초)`
+        el.appendChild(load)
+      }
+      const done = () => { if (load && load.parentNode) load.parentNode.removeChild(load) }
       try {
         const r = await fetch(`/api/pinset?sgg=${sgg}&bjd=${bjd}`)
         const j = await r.json()
+        done()
         pinsetLayerRef.current?.remove(); pinsetLayerRef.current = null
         if (!j.ready || !j.cells?.length) { console.warn(`${dong}: 블록 정밀 데이터 준비중 (PoC는 문래동4가만)`); return }
         const group = L.layerGroup()
@@ -400,7 +412,7 @@ const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], sel
         group.addTo(mapInstance.current)
         pinsetLayerRef.current = group
         if (bounds.length) mapInstance.current.flyToBounds(L.latLngBounds(bounds), { padding: [40, 40], maxZoom: 17, duration: 0.8 })
-      } catch (e) { console.warn('블록 정밀 로드 실패', e) }
+      } catch (e) { done(); console.warn('블록 정밀 로드 실패', e) }
     }
     window.__pinsetClear = () => { pinsetLayerRef.current?.remove(); pinsetLayerRef.current = null }
     return () => { delete window.__pinset; delete window.__pinsetClear }
