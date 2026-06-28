@@ -26,7 +26,7 @@ export default function App() {
   const [zoneQuery, setZoneQuery] = useState('')
   const [redevZones, setRedevZones] = useState([])
   const [showAllZones, setShowAllZones] = useState(false)
-  const [nohu, setNohu] = useState({ on: false, onlyCand: false, grades: [], subtypes: [] })
+  const [nohu, setNohu] = useState({ on: false, candOn: false, grades: [], subtypes: [] })
 
   // "정비사업 보기" 토글 → 선택 구가 있으면 그 구만, 없으면 서울 전체
   useEffect(() => {

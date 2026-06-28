@@ -97,7 +97,7 @@ function RangeRow({ label, min, max, value, onChange, unit, step = 1 }) {
   )
 }
 
-export default function FilterPanel({ filters, onChange, total, loading, onGuSelect, showAllZones, onToggleAllZones, zoneCount = 0, nohu = { on: false, onlyCand: false, grades: [], subtypes: [] }, onNohuChange, open = false, onClose }) {
+export default function FilterPanel({ filters, onChange, total, loading, onGuSelect, showAllZones, onToggleAllZones, zoneCount = 0, nohu = { on: false, candOn: false, grades: [], subtypes: [] }, onNohuChange, open = false, onClose }) {
   const [stationInput, setStationInput] = useState(filters.subwayStation || '')
   const [aptNameInput, setAptNameInput] = useState(filters.aptName || '')
   const [dongList, setDongList] = useState([])
@@ -387,25 +387,30 @@ export default function FilterPanel({ filters, onChange, total, loading, onGuSel
           <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-gray-800">
             🏚️ 노후도 · 재개발 예측
           </h2>
-          <button
-            onClick={() => onNohuChange?.({ ...nohu, on: !nohu.on })}
-            className={`w-full flex items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold border transition-colors ${
-              nohu.on ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-gray-600 border-gray-200 hover:border-rose-300'
-            }`}
-          >
-            <span>🏚️ 동별 노후도 지도표시</span>
-            <span className={nohu.on ? 'text-rose-100' : 'text-rose-400'}>{nohu.on ? 'ON' : 'OFF'}</span>
-          </button>
+          {/* 두 개 독립 토글 */}
+          <div className="space-y-1.5">
+            <button
+              onClick={() => onNohuChange?.({ ...nohu, on: !nohu.on })}
+              className={`w-full flex items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold border transition-colors ${
+                nohu.on ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-gray-600 border-gray-200 hover:border-rose-300'
+              }`}
+            >
+              <span>🏚️ 동별 노후도 (전체)</span>
+              <span className={nohu.on ? 'text-rose-100' : 'text-rose-400'}>{nohu.on ? 'ON' : 'OFF'}</span>
+            </button>
+            <button
+              onClick={() => onNohuChange?.({ ...nohu, candOn: !nohu.candOn })}
+              className={`w-full flex items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold border transition-colors ${
+                nohu.candOn ? 'bg-red-700 text-white border-red-700' : 'bg-white text-gray-600 border-gray-200 hover:border-red-300'
+              }`}
+            >
+              <span>🎯 미지정 재개발 후보만</span>
+              <span className={nohu.candOn ? 'text-red-100' : 'text-red-400'}>{nohu.candOn ? 'ON' : 'OFF'}</span>
+            </button>
+          </div>
 
-          {nohu.on && (
+          {(nohu.on || nohu.candOn) && (
             <div className="mt-2.5 space-y-2.5">
-              <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
-                <input type="checkbox" checked={!!nohu.onlyCand}
-                  onChange={() => onNohuChange?.({ ...nohu, onlyCand: !nohu.onlyCand })}
-                  className="accent-rose-600" />
-                🎯 미지정 재개발 후보만 보기
-              </label>
-
               <div>
                 <p className="mb-1 text-[11px] font-medium text-gray-500">등급 (종합 후보점수)</p>
                 <div className="flex flex-wrap gap-1">

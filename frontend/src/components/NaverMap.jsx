@@ -79,7 +79,7 @@ const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], sel
   const nohuDataRef = useRef(null)
   const [showSubway, setShowSubway] = useState(false)
   const [showSchool, setShowSchool] = useState(false)
-  const showNohu = nohu.on   // 상태는 부모(App)에서 관리
+  const showNohu = nohu.on || nohu.candOn   // 전체 노후도 OR 미지정후보만 (부모 App 관리)
 
   // 부모에서 flyTo / fitTo 호출 가능하도록 노출
   useImperativeHandle(ref, () => ({
@@ -295,8 +295,10 @@ const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], sel
 
     const render = (all) => {
       // 좌측 필터 적용
+      // '전체 노후도' OFF + '미지정 후보만' ON → 후보(verdict='후보')만. 전체 ON이면 전부.
+      const candOnly = nohu.candOn && !nohu.on
       const dongs = all.filter(d => {
-        if (nohu.onlyCand && d.verdict !== '후보') return false
+        if (candOnly && d.verdict !== '후보') return false
         if (nohu.grades?.length && !nohu.grades.includes(d.grade)) return false
         if (nohu.subtypes?.length && !nohu.subtypes.includes(d.subtype)) return false
         return true
@@ -361,7 +363,7 @@ const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], sel
         .then(d => { nohuDataRef.current = d.dongs ?? []; if (showNohu) render(nohuDataRef.current) })
         .catch(() => {})
     }
-  }, [showNohu, nohu.onlyCand, nohu.grades, nohu.subtypes])
+  }, [showNohu, nohu.on, nohu.candOn, nohu.grades, nohu.subtypes])
 
   return (
     <div className="relative h-full w-full">
@@ -392,12 +394,12 @@ const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], sel
         <button
           onClick={() => onNohuToggle?.()}
           className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold shadow transition-all border ${
-            showNohu
+            nohu.on
               ? 'bg-rose-600 text-white border-rose-600'
               : 'bg-white text-gray-600 border-gray-200 hover:border-rose-300'
           }`}
         >
-          🏚️ 노후도 {showNohu ? 'ON' : 'OFF'}
+          🏚️ 노후도 {nohu.on ? 'ON' : 'OFF'}
         </button>
       </div>
 
