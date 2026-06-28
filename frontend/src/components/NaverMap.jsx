@@ -342,6 +342,10 @@ const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], sel
              ${d.lowrise != null ? `사업성 여력: 저층(≤4층) <b>${d.lowrise}%</b> · 평균 <b>${d.avg_floor}층</b>${d.est_far != null ? ` · 추정용적률 <b>${d.est_far}%</b>` : ''}<br/>` : ''}
              <span style="color:#999;font-size:11px">건물 ${d.buildings.toLocaleString()}채 중 ${d.old.toLocaleString()}채 노후</span><br/>
              ${badge}
+             ${d.note ? `<div style="margin-top:5px;padding:5px 7px;border-radius:6px;font-size:11px;line-height:1.5;
+                  background:${d.note_flag === '제약' ? '#fef2f2' : d.note_flag === '진행중' ? '#f5f3ff' : '#fffbeb'};
+                  color:${d.note_flag === '제약' ? '#b91c1c' : d.note_flag === '진행중' ? '#6d28d9' : '#b45309'};">
+                  <b>비고${d.note_flag ? `(${d.note_flag === '제약' ? '🚫 개발제약' : d.note_flag === '진행중' ? '✅ 실제 진행중' : '⚠️ 주의'})` : ''}</b><br/>${d.note}</div>` : ''}
            </div>`)
         circle.addTo(group)
       })
