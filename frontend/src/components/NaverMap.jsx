@@ -338,7 +338,7 @@ const NaverMap = forwardRef(function NaverMap({ properties, redevZones = [], sel
         const badge = isCand
           ? `<span style="color:#dc2626;font-weight:800">🎯 재개발 후보 (미지정)</span>`
           : d.verdict === '진행중'
-            ? `<span style="color:#7c3aed;font-weight:700">정비구역 진행/지정</span>`
+            ? `<span style="color:#7c3aed;font-weight:700">🏗️ 정비구역 진행중${d.zone_program ? ` · ${d.zone_program}` : ''}</span>${d.zone_name ? `<br/><span style="color:#7c3aed;font-size:11px">${d.zone_name}</span>` : ''}`
             : d.verdict === '경계'
               ? `<span style="color:#ca8a04;font-weight:700">경계</span>`
               : `<span style="color:#16a34a;font-weight:700">신축 위주</span>`
